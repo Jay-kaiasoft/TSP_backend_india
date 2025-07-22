@@ -12,7 +12,7 @@ public interface CompanyEmployeeService {
 
     List<Map<String, Object>> getAllEmployeeListByCompanyId(int companyId);
 
-    List<CompanyEmployeeDto> getAllEmployeeByCompanyId(int companyId, int id);
+    List<CompanyEmployeeDto> getAllEmployeeByCompanyId(int companyId);
 
     CompanyEmployeeDto getEmployee(int id);
 

@@ -31,6 +31,6 @@ public interface CompanyEmployeeRepository extends JpaRepository<CompanyEmployee
     @Query("SELECT c FROM CompanyEmployee c WHERE c.companyDetails.companyNo=:companyNo AND c.userName=:userName AND c.email=:email")
     CompanyEmployee findByCompanyNoAndUserName(String companyNo, String userName, String email);
 
-    @Query("SELECT c FROM CompanyEmployee c WHERE c.isContractor=:number AND c.companyDetails.id=:id")
-    List<CompanyEmployee> findAllContractors(int id, int number);
+    @Query("SELECT c FROM CompanyEmployee c WHERE c.companyDetails.id=:id")
+    List<CompanyEmployee> findAllContractors(int id);
 }

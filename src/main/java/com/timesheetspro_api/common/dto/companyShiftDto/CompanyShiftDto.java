@@ -10,8 +10,8 @@ public class CompanyShiftDto {
     private int companyId;
     private String shiftName;
     private String shiftType;
-    private Timestamp timeStart;
-    private Timestamp timeEnd;
+    private Timestamp startTime;
+    private Timestamp endTime;
     private float hours;
     private float totalHours;
 }

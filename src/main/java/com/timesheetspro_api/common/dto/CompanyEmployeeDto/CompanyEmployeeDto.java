@@ -50,18 +50,14 @@ public class CompanyEmployeeDto {
     private String departmentName;
 
     private int employeeTypeId;
-    private String ext;
 
     private String payPeriod;
     private String 	payClass;
     private String hiredDate;
     private int bankAccountId;
     private int isActive;
-    private int isContractor;
     private int themeId;
     private int shiftId;
-    private String workState;
-    private String workLocation;
     private String companyLocation;
     private Integer checkGeofence;
     private float[] embedding;
@@ -74,6 +70,8 @@ public class CompanyEmployeeDto {
     private Integer ptAmount;
     private Integer basicSalary;
     private Integer grossSalary;
+    private String canteenType;
+    private Integer canteenAmount;
 
     private CompanyShiftDto companyShiftDto;
     private EmployeeBackAccountInfoDTO employeeBackAccountInfoDTO;

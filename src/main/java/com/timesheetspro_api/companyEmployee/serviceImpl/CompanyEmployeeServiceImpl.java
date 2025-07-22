@@ -145,9 +145,9 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
     }
 
     @Override
-    public List<CompanyEmployeeDto> getAllEmployeeByCompanyId(int companyId, int id) {
+    public List<CompanyEmployeeDto> getAllEmployeeByCompanyId(int companyId) {
         try {
-            List<CompanyEmployee> companyEmployeeList = this.companyEmployeeRepository.findAllContractors(companyId, id);
+            List<CompanyEmployee> companyEmployeeList = this.companyEmployeeRepository.findAllContractors(companyId);
             List<CompanyEmployeeDto> companyEmployeeDtoList = new ArrayList<>();
 
             if (!companyEmployeeList.isEmpty()) {

@@ -119,18 +119,6 @@ public class CompanyEmployee implements UserDetails {
     @Column(name = "is_active")
     private int isActive;
 
-    @Column(name = "is_contractor")
-    private int isContractor;
-
-    @Column(name = "ext")
-    private String ext;
-
-    @Column(name = "work_state")
-    private String workState;
-
-    @Column(name = "work_location")
-    private String workLocation;
-
     @Column(name = "company_location")
     private String companyLocation;
 
@@ -167,6 +155,12 @@ public class CompanyEmployee implements UserDetails {
 
     @Column(name = "gross_salary")
     private Integer grossSalary;
+
+    @Column(name = "canteen_type")
+    private String canteenType;
+
+    @Column(name = "canteen_amount")
+    private Integer canteenAmount;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

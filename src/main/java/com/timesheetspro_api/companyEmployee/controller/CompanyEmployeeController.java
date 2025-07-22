@@ -20,11 +20,11 @@ public class CompanyEmployeeController {
     @Autowired
     private CompanyEmployeeService companyEmployeeService;
 
-    @GetMapping("/getAllCompanyEmployee/{companyId}/{id}")
-    public ApiResponse<?> getAllEmployeeByCompanyId(@PathVariable int companyId, @PathVariable int id) {
+    @GetMapping("/getAllCompanyEmployee/{companyId}")
+    public ApiResponse<?> getAllEmployeeByCompanyId(@PathVariable int companyId) {
         Map<String, Object> resBody = new HashMap<>();
         try {
-            List<CompanyEmployeeDto> companyEmployeeDtoList = this.companyEmployeeService.getAllEmployeeByCompanyId(companyId, id);
+            List<CompanyEmployeeDto> companyEmployeeDtoList = this.companyEmployeeService.getAllEmployeeByCompanyId(companyId);
             return new ApiResponse<>(HttpStatus.OK.value(), "Fetch employee details successfully", companyEmployeeDtoList);
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to fetch company details", resBody);
