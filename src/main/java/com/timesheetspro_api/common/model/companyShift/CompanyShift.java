@@ -30,14 +30,14 @@ public class CompanyShift {
     private String shiftType;
 
     @Column(name = "time_start")
-    private Timestamp timeStart;
+    private Timestamp startTime;
 
     @Column(name = "time_end")
-    private Timestamp timeEnd;
+    private Timestamp endTime;
 
     @Column(name = "hours")
     private float hours;
 
     @Column(name = "total_hours")
-    private float totalHours;
+    private Integer totalHours;
 }

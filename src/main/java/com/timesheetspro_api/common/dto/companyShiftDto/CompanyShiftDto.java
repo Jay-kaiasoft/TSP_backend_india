@@ -13,5 +13,5 @@ public class CompanyShiftDto {
     private Timestamp startTime;
     private Timestamp endTime;
     private float hours;
-    private float totalHours;
+    private Integer totalHours;
 }
