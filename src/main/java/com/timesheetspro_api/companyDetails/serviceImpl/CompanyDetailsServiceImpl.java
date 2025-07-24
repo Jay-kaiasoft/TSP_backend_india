@@ -183,7 +183,7 @@ public class CompanyDetailsServiceImpl implements CompanyDetailsService {
                 }
                 CompanyDetails isEinExits = this.companyDetailsRepository.findByCompanyEin(companyDetailsDto.getEin());
                 if (isEinExits != null) {
-                    throw new GlobalException("EIN no " + companyDetailsDto.getEin() + " is already registered");
+                    throw new GlobalException("GST number " + companyDetailsDto.getEin() + " is already registered");
                 }
                 companyDetails.setIsActive(1);
                 Date currentDate = new Date();
@@ -222,7 +222,7 @@ public class CompanyDetailsServiceImpl implements CompanyDetailsService {
                 }
                 CompanyDetails isEinExits = this.companyDetailsRepository.findAllExceptCompanyByEin(id, companyDetailsDto.getEin());
                 if (isEinExits != null) {
-                    throw new GlobalException("EIN no " + companyDetailsDto.getEin() + " is already registered");
+                    throw new GlobalException("GST number " + companyDetailsDto.getEin() + " is already registered");
                 }
                 companyDetails.setIsActive(1);
                 BeanUtils.copyProperties(companyDetailsDto, companyDetails, "id");

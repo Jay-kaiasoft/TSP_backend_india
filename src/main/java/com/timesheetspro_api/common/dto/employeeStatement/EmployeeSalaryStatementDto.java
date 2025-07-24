@@ -11,6 +11,8 @@ public class EmployeeSalaryStatementDto {
     private Integer overTime;
     private Integer otAmount;
     private Integer pfAmount;
+    private Integer totalPfAmount;
+    private Integer pfPercentage;
     private Integer ptAmount;
     private Integer totalEarnings;
     private Integer totalDeductions;

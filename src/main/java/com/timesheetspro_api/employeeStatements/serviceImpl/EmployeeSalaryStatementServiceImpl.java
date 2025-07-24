@@ -1,5 +1,6 @@
 package com.timesheetspro_api.employeeStatements.serviceImpl;
 
+import com.timesheetspro_api.common.constants.Constants;
 import com.timesheetspro_api.common.dto.employeeStatement.EmployeeSalaryStatementDto;
 import com.timesheetspro_api.common.dto.employeeStatement.SalaryStatementRequestDto;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
@@ -74,12 +75,12 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
     private EmployeeSalaryStatementDto buildEmployeeSalaryStatement(CompanyEmployee companyEmployee, Integer month) {
         EmployeeSalaryStatementDto dto = new EmployeeSalaryStatementDto();
         Integer employeeId = companyEmployee.getEmployeeId();
-
         dto.setEmployeeId(employeeId);
         dto.setEmployeeName(companyEmployee.getUsername());
-        dto.setBasicSalary(companyEmployee.getBasicSalary() * month);
+        if (companyEmployee.getBasicSalary() != null) {
+            dto.setBasicSalary(companyEmployee.getBasicSalary() * month);
+        }
         dto.setDepartmentName(companyEmployee.getDepartment().getDepartmentName());
-
         // Set default OT
         Integer otAmountFinal = 0;
         Integer otFinalMinutes = 0;
@@ -87,10 +88,8 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         // Calculate OT if UserInOut exists
         long totalWorkedMillis = 0;
         Integer employeeShiftHours = companyEmployee.getCompanyShift().getTotalHours();
-
         List<Date[]> dateRanges = getLastNMonthDateRanges(month); // Use the given month
         Specification<UserInOut> userSpec = Specification.where(EmployeeStatementSpecification.hasUserIds(List.of(employeeId)));
-
         Specification<UserInOut> dateSpec = Specification.where(null);
         for (Date[] range : dateRanges) {
             dateSpec = dateSpec.or(EmployeeStatementSpecification.betweenCreatedOn(range[0], range[1]));
@@ -103,15 +102,14 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             for (UserInOut userInOut : userInOutList) {
                 Date timeIn = userInOut.getTimeIn() != null ? new Date(userInOut.getTimeIn().getTime()) : null;
                 Date timeOut = userInOut.getTimeOut() != null ? new Date(userInOut.getTimeOut().getTime()) : null;
-                if (timeIn != null && timeOut != null && timeOut.after(timeIn)) {
+
+                if (timeIn != null && timeOut != null) {
                     totalWorkedMillis += timeOut.getTime() - timeIn.getTime();
                 }
             }
-
             long totalWorkedMinutes = totalWorkedMillis / (1000 * 60);
             long shiftMinutes = employeeShiftHours * 60L;
             long otMinutes = Math.max(totalWorkedMinutes - shiftMinutes, 0);
-
             otFinalMinutes = (int) otMinutes;
 
             List<OvertimeRules> overtimeRules = this.overtimeRulesRepository.findByCompanyId(companyEmployee.getCompanyDetails().getId());
@@ -119,13 +117,24 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 for (OvertimeRules rule : overtimeRules) {
                     String userIds = rule.getUserIds();
                     if (userIds != null && userIds.contains(String.valueOf(employeeId))) {
-                        Integer otMinutesSlab = rule.getOtMinutes();
                         Float otPayPerSlab = rule.getOtAmount();
+                        String otType = rule.getOtType();
 
-                        if (otMinutesSlab != null && otMinutesSlab > 0 && otPayPerSlab != null) {
-                            long otUnits = otMinutes / otMinutesSlab;
-                            otAmountFinal = (int) (otUnits * otPayPerSlab);
-                            break;
+                        if (otType.equals("Fixed Amount")) {
+                            otAmountFinal = otPayPerSlab != null ? otPayPerSlab.intValue() : 0;
+                        } else if (otType.equals("Fixed Amount Per Hour")) {
+                            long otHours = (long) Math.ceil(otFinalMinutes / 60.0);
+                            otAmountFinal = (int) (otHours * otPayPerSlab);
+                        } else if (otType.equals("1x Salary")) {
+                            otAmountFinal = companyEmployee.getBasicSalary() * month;
+                        } else if (otType.equals("1.5x Salary")) {
+                            otAmountFinal = (int) ((companyEmployee.getBasicSalary() * month) * 1.5);
+                        } else if (otType.equals("2x Salary")) {
+                            otAmountFinal = companyEmployee.getBasicSalary() * month * 2;
+                        } else if (otType.equals("2.5x Salary")) {
+                            otAmountFinal = (int) ((companyEmployee.getBasicSalary() * month) * 2.5);
+                        } else if (otType.equals("3x Salary")) {
+                            otAmountFinal = companyEmployee.getBasicSalary() * month * 3;
                         }
                     }
                 }
@@ -143,12 +152,14 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             Integer pfPercentage = companyEmployee.getPfPercentage();
 
             if (fixedPfAmount != null) {
+                dto.setPfAmount(companyEmployee.getPfAmount());
                 pfAmount = (basicSalary - fixedPfAmount) * month;
             } else if (pfPercentage != null) {
+                dto.setPfPercentage(companyEmployee.getPfPercentage());
                 pfAmount = ((basicSalary * pfPercentage) / 100) * month;
             }
         }
-        dto.setPfAmount(pfAmount);
+        dto.setTotalPfAmount(pfAmount);
 
 // PT calculation for multiple months
         Integer ptAmount = 0;

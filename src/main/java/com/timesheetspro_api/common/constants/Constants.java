@@ -13,7 +13,15 @@ public interface Constants {
     final String CHARACTER_ENCODING_UTF_8 = "UTF-8";
     final String REQUEST_HEADER_AUTHORIZATION = "Authorization";
     final String AUTHORIZATION_BEARER = "Bearer ";
-
+    final List<String> OT_TYPE = List.of(
+            "Fixed Amount",
+            "Fixed Amount Per Hour",
+            "1x Salary",
+            "1.5x Salary",
+            "2x Salary",
+            "2.5x Salary",
+            "3x Salary"
+    );
 
     final List<Map<String, Object>> PT_RULES = List.of(
             Map.of(
