@@ -1,6 +1,8 @@
 package com.timesheetspro_api.employeeStatements.serviceImpl;
 
-import com.timesheetspro_api.common.constants.Constants;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import com.timesheetspro_api.common.dto.employeeStatement.EmployeeSalaryStatementDto;
 import com.timesheetspro_api.common.dto.employeeStatement.SalaryStatementRequestDto;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
@@ -18,7 +20,9 @@ import org.springframework.stereotype.Service;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service(value = "EmployeeSalaryStatementService")
 public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStatementService {
@@ -77,26 +81,38 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         Integer employeeId = companyEmployee.getEmployeeId();
         dto.setEmployeeId(employeeId);
         dto.setEmployeeName(companyEmployee.getUsername());
+
         if (companyEmployee.getBasicSalary() != null) {
             dto.setBasicSalary(companyEmployee.getBasicSalary() * month);
         }
+
         dto.setDepartmentName(companyEmployee.getDepartment().getDepartmentName());
-        // Set default OT
+
         Integer otAmountFinal = 0;
         Integer otFinalMinutes = 0;
 
-        // Calculate OT if UserInOut exists
         long totalWorkedMillis = 0;
         Integer employeeShiftHours = companyEmployee.getCompanyShift().getTotalHours();
-        List<Date[]> dateRanges = getLastNMonthDateRanges(month); // Use the given month
+
+        List<Date[]> dateRanges = getLastNMonthDateRanges(month);
         Specification<UserInOut> userSpec = Specification.where(EmployeeStatementSpecification.hasUserIds(List.of(employeeId)));
         Specification<UserInOut> dateSpec = Specification.where(null);
+        Long totalDays = 0L;
+
         for (Date[] range : dateRanges) {
             dateSpec = dateSpec.or(EmployeeStatementSpecification.betweenCreatedOn(range[0], range[1]));
+
+            LocalDate start = range[0].toLocalDate();
+            LocalDate end = range[1].toLocalDate();
+
+            long daysBetween = ChronoUnit.DAYS.between(start, end) + 1;
+            totalDays += daysBetween;
         }
 
         userSpec = userSpec.and(dateSpec);
         List<UserInOut> userInOutList = this.userInOutRepository.findAll(userSpec);
+
+        Map<LocalDate, Long> dailyWorkedMinutes = new HashMap<>();
 
         if (!userInOutList.isEmpty()) {
             for (UserInOut userInOut : userInOutList) {
@@ -104,9 +120,20 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 Date timeOut = userInOut.getTimeOut() != null ? new Date(userInOut.getTimeOut().getTime()) : null;
 
                 if (timeIn != null && timeOut != null) {
-                    totalWorkedMillis += timeOut.getTime() - timeIn.getTime();
+                    long workedMillis = timeOut.getTime() - timeIn.getTime();
+                    totalWorkedMillis += workedMillis;
+
+                    // Safe conversion for LocalDate
+                    Instant instant = new java.util.Date(timeIn.getTime()).toInstant();
+                    LocalDate date = instant.atZone(ZoneId.systemDefault()).toLocalDate();
+
+                    long workedMinutes = workedMillis / (1000 * 60);
+
+                    dailyWorkedMinutes.merge(date, workedMinutes, Long::sum);
                 }
+
             }
+
             long totalWorkedMinutes = totalWorkedMillis / (1000 * 60);
             long shiftMinutes = employeeShiftHours * 60L;
             long otMinutes = Math.max(totalWorkedMinutes - shiftMinutes, 0);
@@ -152,16 +179,16 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             Integer pfPercentage = companyEmployee.getPfPercentage();
 
             if (fixedPfAmount != null) {
-                dto.setPfAmount(companyEmployee.getPfAmount());
+                dto.setPfAmount(fixedPfAmount);
                 pfAmount = (basicSalary - fixedPfAmount) * month;
             } else if (pfPercentage != null) {
-                dto.setPfPercentage(companyEmployee.getPfPercentage());
+                dto.setPfPercentage(pfPercentage);
                 pfAmount = ((basicSalary * pfPercentage) / 100) * month;
             }
         }
         dto.setTotalPfAmount(pfAmount);
 
-// PT calculation for multiple months
+        // PT calculation for multiple months
         Integer ptAmount = 0;
         if (companyEmployee.getIsPt()) {
             Integer monthlyPt = companyEmployee.getPtAmount() != null ? companyEmployee.getPtAmount() : 0;
@@ -172,14 +199,43 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         // Final salary calculations
         Integer totalEarnings = dto.getBasicSalary() + dto.getOtAmount();
         Integer totalDeductions = pfAmount + ptAmount;
-        Integer netSalary = totalEarnings - totalDeductions;
+        Integer otherDeductions = 0;
 
+        if (companyEmployee.getCanteenType().equals("Office Type")) {
+            otherDeductions = companyEmployee.getCanteenAmount() * month;
+            totalDeductions += otherDeductions;
+        } else {
+            int heavyWorkingDays = 0;
+
+            // Count number of days user worked > 15 hours
+            for (Map.Entry<LocalDate, Long> entry : dailyWorkedMinutes.entrySet()) {
+                long workedMinutes = entry.getValue();
+                if (workedMinutes > 15 * 60) {
+                    heavyWorkingDays++;
+                }
+            }
+
+            int totalWorkingDays = totalDays.intValue();
+            int lightWorkingDays = totalWorkingDays - heavyWorkingDays;
+
+            int perDayCanteen = companyEmployee.getCanteenAmount();
+            int adjustedCanteenAmount = (lightWorkingDays * perDayCanteen * 2) + (heavyWorkingDays * perDayCanteen);
+
+            otherDeductions = adjustedCanteenAmount;
+            totalDeductions += otherDeductions;
+        }
+
+        totalDeductions += otherDeductions;
+
+        Integer netSalary = totalEarnings - totalDeductions;
+        dto.setOtherDeductions(otherDeductions);
         dto.setTotalEarnings(totalEarnings);
         dto.setTotalDeductions(totalDeductions);
         dto.setNetSalary(netSalary);
 
         return dto;
     }
+
 
     private static List<Date[]> getLastNMonthDateRanges(int monthCount) {
         List<Date[]> result = new ArrayList<>();
