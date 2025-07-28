@@ -54,6 +54,12 @@ public class CompanyEmployee implements UserDetails {
     @Column(name = "phone")
     private String phone;
 
+    @Column(name = "emergency_phone")
+    private String emergencyPhone;
+
+    @Column(name = "alt_phone")
+    private String altPhone;
+
     @Column(name = "profile_image")
     private String profileImage;
 
@@ -137,6 +143,9 @@ public class CompanyEmployee implements UserDetails {
 
     @Column(name = "is_pf")
     private Boolean isPf;
+
+    @Column(name = "pf_type")
+    private String pfType;
 
     @Column(name = "pf_percentage")
     private Integer pfPercentage;

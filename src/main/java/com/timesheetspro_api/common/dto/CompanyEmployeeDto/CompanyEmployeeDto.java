@@ -26,6 +26,9 @@ public class CompanyEmployeeDto {
     private String password;
     @NotNull(message = "Phone is required")
     private String phone;
+    private String emergencyPhone;
+    private String altPhone;
+
     private String profileImage;
     private CompanyEmployeeRolesDto companyEmployeeRolesDto;
     private String gender;
@@ -64,6 +67,7 @@ public class CompanyEmployeeDto {
     private String bloodGroup;
     private String aadharImage;
     private Boolean isPf;
+    private String pfType;
     private Integer pfPercentage;
     private Integer pfAmount;
     private Boolean isPt;

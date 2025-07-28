@@ -128,7 +128,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                     LocalDate date = instant.atZone(ZoneId.systemDefault()).toLocalDate();
 
                     long workedMinutes = workedMillis / (1000 * 60);
-
                     dailyWorkedMinutes.merge(date, workedMinutes, Long::sum);
                 }
 

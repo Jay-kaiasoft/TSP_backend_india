@@ -150,7 +150,7 @@ public class CommonServiceImpl implements CommonService {
                 // Determine the file type (video or image) based on extension
                 String fileExtension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
                 boolean isVideo = fileExtension.matches("mp4|mkv|avi|mov");
-                boolean isImage = fileExtension.matches("jpg|jpeg|png|gif");
+                boolean isImage = fileExtension.matches("jpg|jpeg|png");
 
                 if (!(isImage || isVideo)) {
                     resBody.put("status", 400);

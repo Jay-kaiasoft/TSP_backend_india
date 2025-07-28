@@ -1,11 +1,11 @@
 package com.timesheetspro_api.companyEmployee.serviceImpl;
 
-import com.timesheetspro_api.common.constants.Constants;
 import com.timesheetspro_api.common.dto.CompanyEmployeeDto.CompanyEmployeeDto;
 import com.timesheetspro_api.common.dto.CompanyEmployeeDto.EmployeeDto;
 import com.timesheetspro_api.common.dto.CompanyEmployeeRoles.CompanyEmployeeRolesDto;
 import com.timesheetspro_api.common.exception.GlobalException;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
+import com.timesheetspro_api.common.model.UserInOut.UserInOut;
 import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
 import com.timesheetspro_api.common.model.companyEmployeeRoles.CompanyEmployeeRoles;
 import com.timesheetspro_api.common.model.companyShift.CompanyShift;
@@ -13,13 +13,23 @@ import com.timesheetspro_api.common.model.department.Department;
 import com.timesheetspro_api.common.model.employeeBackAccountInfo.EmployeeBackAccountInfo;
 import com.timesheetspro_api.common.model.employeeType.EmployeeType;
 import com.timesheetspro_api.common.repository.DepartmentRepository;
+import com.timesheetspro_api.common.repository.UserInOutRepository;
 import com.timesheetspro_api.common.repository.company.*;
 import com.timesheetspro_api.common.service.CommonService;
+import com.timesheetspro_api.common.specification.EmployeeStatementSpecification;
 import com.timesheetspro_api.companyEmployee.service.CompanyEmployeeService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.sql.Date;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Calendar; // Import Calendar class
 
 import java.io.File;
@@ -53,75 +63,309 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
     private CompanyShiftRepository companyShiftRepository;
 
     @Autowired
+    private UserInOutRepository userInOutRepository;
+
+    @Autowired
     private CommonService commonService;
 
+    //    @Override
+//    public List<Map<String, Object>> getReports(int companyId, String type, int month) {
+//        try {
+//            List<Map<String, Object>> response = new ArrayList<>();
+//            List<CompanyEmployee> companyEmployeeList = new ArrayList<>();
+//            if (type.equals("PF")) {
+//                companyEmployeeList = this.companyEmployeeRepository.getReportByPF(companyId);
+//            }
+//            if (type.equals("PT")) {
+//                companyEmployeeList = this.companyEmployeeRepository.getReportByPT(companyId);
+//            }
+//
+//            if (!companyEmployeeList.isEmpty()) {
+//                for (CompanyEmployee companyEmployee : companyEmployeeList) {
+//                    Map<String, Object> res = new HashMap<>();
+//                    CompanyEmployeeDto companyEmployeeDto = this.getEmployee(companyEmployee.getEmployeeId());
+//                    res.put("employeeId", companyEmployeeDto.getEmployeeId());
+//                    res.put("userName", companyEmployeeDto.getUserName());
+//
+//                    if (type.equals("PF") && companyEmployee.getIsPf()) {
+//                        Integer pfPercentage = companyEmployee.getPfPercentage();
+//                        Integer pfAmount = companyEmployee.getPfAmount();
+//
+//                        List<Date[]> dateRanges = getLastNMonthDateRanges(month);
+//                        Long totalDays = 0L;
+//                        LocalDate start = null;
+//                        LocalDate end = null;
+//
+//                        for (Date[] range : dateRanges) {
+//                            start = range[0].toLocalDate();
+//                            end = range[1].toLocalDate();
+//                            long daysBetween = ChronoUnit.DAYS.between(start, end) + 1;
+//                            totalDays += daysBetween;
+//                        }
+//
+//                        Integer basicSalaryPerMonth = companyEmployeeDto.getBasicSalary();
+//
+//                        Long basicSalaryPerDay = basicSalaryPerMonth / totalDays;
+//                        java.util.Date hiredDate = companyEmployee.getHiredDate();
+//                        Long getWorkingDays = 0L;
+//
+//                        if (hiredDate != null) {
+//                            Calendar calendar = Calendar.getInstance();
+//                            calendar.setTime(hiredDate);
+//                            int hiredYear = calendar.get(Calendar.YEAR);
+//                            int hiredMonth = calendar.get(Calendar.MONTH) + 1; // Months are 0-based in Calendar
+//                            int hiredDay = calendar.get(Calendar.DAY_OF_MONTH);
+//
+//                            LocalDate hiredLocalDate = LocalDate.of(hiredYear, hiredMonth, hiredDay);
+//                            LocalDate currentLocalDate = LocalDate.now();
+//
+//                            getWorkingDays = ChronoUnit.DAYS.between(hiredLocalDate, currentLocalDate) + 1;
+//                        }
+//
+//                        Long totalBasicSalary = basicSalaryPerDay * getWorkingDays;
+//
+//                        if (companyEmployee.getPfType().equals("Percentage")) {
+//                            Long pfAmountPerMonth = (totalBasicSalary * pfPercentage) / 100;
+//                            Long totalPfAmount = pfAmountPerMonth * month;
+//
+//                            res.put("basic_salary", basicSalaryPerMonth);
+//                            res.put("total_basic_salary", totalBasicSalary);
+//
+//                            res.put("employee_pf_amount", totalPfAmount);
+//                            res.put("employer_pf_amount", totalPfAmount);
+//                            res.put("pf_percentage", pfPercentage);
+//                            res.put("total_amount", totalPfAmount * 2);
+//                        } else {
+//                            Long totalPfAmount = totalDays / pfAmount * getWorkingDays;
+//                            if (companyEmployee.getEmployeeId() == 28) {
+//                                System.out.println("======== Pf Amount Calculation ========" + totalPfAmount);
+//                            }
+//                            res.put("basic_salary", basicSalaryPerMonth);
+//                            res.put("total_basic_salary", totalBasicSalary);
+//                            res.put("employee_pf_amount", totalPfAmount);
+//                            res.put("employer_pf_amount", totalPfAmount);
+//                            res.put("total_amount", totalPfAmount * 2);
+//                        }
+//
+//                        if (companyEmployee.getEmployeeId() == 28) {
+//                            System.out.println("totalDays: " + totalDays);
+//                            System.out.println("getWorkingDays: " + getWorkingDays);
+//                            System.out.println("basicSalaryPerDay: " + basicSalaryPerDay);
+//                            System.out.println("totalBasicSalary: " + totalBasicSalary);
+//                            System.out.println("pfPercentage: " + pfPercentage);
+//                            System.out.println("pfAmount: " + pfAmount);
+//                        }
+//
+//                    }
+//
+//                    if (type.equals("PT") && companyEmployee.getIsPt()) {
+//                        Integer totalBasicSalary = companyEmployee.getGrossSalary() * month;
+//                        Integer totalPtAmount = companyEmployee.getPtAmount() * month;
+//
+//                        res.put("gross_salary", companyEmployee.getGrossSalary());
+//                        res.put("total_gross_salary", totalBasicSalary);
+//                        res.put("pt_amount", totalPtAmount);
+//                    }
+//                    response.add(res);
+//                }
+//            }
+//            return response;
+//        } catch (Exception e) {
+//            throw new RuntimeException(e);
+//        }
+//    }
+
+//    @Override
+//    public List<Map<String, Object>> getReports(int companyId, String type, int month) {
+//        try {
+//            List<Map<String, Object>> response = new ArrayList<>();
+//
+//            List<CompanyEmployee> companyEmployeeList = switch (type) {
+//                case "PF" -> companyEmployeeRepository.getReportByPF(companyId);
+//                case "PT" -> companyEmployeeRepository.getReportByPT(companyId);
+//                default -> Collections.emptyList();
+//            };
+//
+//            if (companyEmployeeList.isEmpty()) return response;
+//
+//            for (CompanyEmployee employee : companyEmployeeList) {
+//                Map<String, Object> res = new HashMap<>();
+//                CompanyEmployeeDto dto = getEmployee(employee.getEmployeeId());
+//
+//                res.put("employeeId", dto.getEmployeeId());
+//                res.put("userName", dto.getUserName());
+//
+//                if ("PF".equals(type) && Boolean.TRUE.equals(employee.getIsPf())) {
+//                    Integer pfPercentage = employee.getPfPercentage() != null ? employee.getPfPercentage() : 0;
+//                    Integer pfAmount = employee.getPfAmount() != null ? employee.getPfAmount() : 0;
+//                    Integer basicSalary = employee.getBasicSalary() != null ? employee.getBasicSalary() : 0;
+//
+//                    List<Date[]> dateRanges = getLastNMonthDateRanges(month);
+//                    long totalDays = dateRanges.stream()
+//                            .mapToLong(range -> ChronoUnit.DAYS.between(range[0].toLocalDate(), range[1].toLocalDate()) + 1)
+//                            .sum();
+//
+//                    long basicPerDay = totalDays > 0 ? basicSalary / totalDays : 0;
+//                    long workingDays = 0;
+//
+//                    if (employee.getHiredDate() != null) {
+//                        LocalDate hired = (employee.getHiredDate() instanceof java.sql.Date)
+//                                ? ((java.sql.Date) employee.getHiredDate()).toLocalDate()
+//                                : employee.getHiredDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+//
+//                        workingDays = ChronoUnit.DAYS.between(hired, LocalDate.now()) + 1;
+//                    }
+//
+//                    long totalBasic = basicPerDay * workingDays;
+//
+//                    long totalPf = "Percentage".equals(employee.getPfType()) ? ((totalBasic * pfPercentage) / 100) * month  : pfAmount != 0 ? (totalDays / pfAmount) * workingDays : 0;
+//
+//                    res.put("basic_salary", basicSalary);
+//                    res.put("total_basic_salary", totalBasic);
+//                    res.put("employee_pf_amount", totalPf);
+//                    res.put("employer_pf_amount", totalPf);
+//                    res.put("total_amount", totalPf * 2);
+//
+//                    if ("Percentage".equals(employee.getPfType())) {
+//                        res.put("pf_percentage", pfPercentage);
+//                    }
+//                } else if ("PT".equals(type) && Boolean.TRUE.equals(employee.getIsPt())) {
+//                    int grossSalary = employee.getGrossSalary();
+//                    int ptAmount = employee.getPtAmount();
+//
+//                    res.put("gross_salary", grossSalary);
+//                    res.put("total_gross_salary", grossSalary * month);
+//                    res.put("pt_amount", ptAmount * month);
+//                }
+//                response.add(res);
+//            }
+//            return response;
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            throw new RuntimeException(e);
+//        }
+//    }
+
     @Override
-    public List<Map<String, Object>> getReports(int companyId, String type,int month) {
+    public List<Map<String, Object>> getReports(int companyId, String type, int month) {
         try {
             List<Map<String, Object>> response = new ArrayList<>();
-            List<CompanyEmployee> companyEmployeeList = new ArrayList<>();
-            if (type.equals("PF")){
-                companyEmployeeList = this.companyEmployeeRepository.getReportByPF(companyId);
+            List<Date[]> dateRanges = getLastNMonthDateRanges(month);
+            Specification<UserInOut> dateSpec = Specification.where(null);
+            Long totalDays = 0L;
+
+            for (Date[] range : dateRanges) {
+                dateSpec = dateSpec.or(EmployeeStatementSpecification.betweenCreatedOn(range[0], range[1]));
+
+                LocalDate start = range[0].toLocalDate();
+                LocalDate end = range[1].toLocalDate();
+                long daysBetween = ChronoUnit.DAYS.between(start, end) + 1;
+                totalDays += daysBetween;
             }
-            if (type.equals("PT")){
-                companyEmployeeList = this.companyEmployeeRepository.getReportByPT(companyId);
+
+            List<UserInOut> userInOutList = this.userInOutRepository.findAll(dateSpec);
+
+            Map<Integer, Set<LocalDate>> employeeWorkDays = new HashMap<>();
+
+            for (UserInOut userInOut : userInOutList) {
+                CompanyEmployee employee = userInOut.getUser();
+                if (employee == null) continue;
+
+                int empId = employee.getEmployeeId();
+                LocalDate workDate = ((java.sql.Date) userInOut.getCreatedOn()).toLocalDate();
+                employeeWorkDays.computeIfAbsent(empId, k -> new HashSet<>()).add(workDate);
             }
-            if (!companyEmployeeList.isEmpty()) {
-                for (CompanyEmployee companyEmployee : companyEmployeeList) {
-                    Map<String, Object> res = new HashMap<>();
-                    CompanyEmployeeDto companyEmployeeDto = this.getEmployee(companyEmployee.getEmployeeId());
-                    res.put("employeeId",companyEmployeeDto.getEmployeeId());
-                    res.put("userName",companyEmployeeDto.getUserName());
 
-                    if (type.equals("PF") && companyEmployee.getIsPf()) {
-                        Integer pfPercentage = companyEmployee.getPfPercentage();
-                        Integer pfAmount = companyEmployee.getPfAmount();
+            for (Map.Entry<Integer, Set<LocalDate>> entry : employeeWorkDays.entrySet()) {
+                Integer empId = entry.getKey();
+                int daysWorked = entry.getValue().size();
 
-                        if (pfPercentage != null && pfPercentage != 0){
-                            Integer basicSalaryPerMonth = companyEmployeeDto.getBasicSalary();
+                Optional<CompanyEmployee> employeeOpt = this.companyEmployeeRepository.findById(empId);
+                if (employeeOpt.isPresent()) {
+                    CompanyEmployee emp = employeeOpt.get();
 
-                            Integer totalBasicSalary = basicSalaryPerMonth * month;
-                            Integer pfAmountPerMonth = (basicSalaryPerMonth * pfPercentage) / 100;
-                            Integer totalPfAmount = pfAmountPerMonth * month;
+                    if ("PF".equals(type) && Boolean.TRUE.equals(emp.getIsPf())) {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("employeeId", empId);
+                        map.put("userName", emp.getUsername());
+                        map.put("daysWorked", daysWorked);
+                        map.put("totalDays", totalDays);
+                        map.put("pf_type", emp.getPfType());
 
-                            res.put("basic_salary", basicSalaryPerMonth);
-                            res.put("total_basic_salary", totalBasicSalary);
+                        if ("Percentage".equals(emp.getPfType())) {
+                            Integer pfPercentage = Optional.ofNullable(emp.getPfPercentage()).orElse(0);
+                            Integer totalBasicSalary = emp.getBasicSalary() * month;
 
-                            res.put("employee_pf_amount", totalPfAmount);
-                            res.put("employer_pf_amount", totalPfAmount);
-                            res.put("pf_percentage", pfPercentage);
-                            res.put("total_amount", totalPfAmount * 2);
-                        }else{
-                            Integer basicSalaryPerMonth = companyEmployeeDto.getBasicSalary();
+                            BigDecimal basicSalaryPerMonth = BigDecimal.valueOf(emp.getBasicSalary());
+                            BigDecimal basicSalaryPerDay = basicSalaryPerMonth.divide(BigDecimal.valueOf(30), 2, RoundingMode.HALF_UP);
 
-                            Integer totalBasicSalary = basicSalaryPerMonth * month;
-                            Integer totalPfAmount = pfAmount * month;
+                            BigDecimal pfAmountPerDay = basicSalaryPerDay
+                                    .multiply(BigDecimal.valueOf(pfPercentage))
+                                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
-                            res.put("basic_salary", basicSalaryPerMonth);
-                            res.put("total_basic_salary", totalBasicSalary);
+                            BigDecimal totalPfAmount = pfAmountPerDay.multiply(BigDecimal.valueOf(daysWorked));
 
-                            res.put("employee_pf_amount", totalPfAmount);
-                            res.put("employer_pf_amount", totalPfAmount);
-                            res.put("total_amount", totalPfAmount * 2);
+                            map.put("basic_salary", emp.getBasicSalary());
+                            map.put("total_basic_salary", totalBasicSalary);
+                            map.put("employee_pf_amount", totalPfAmount);
+                            map.put("employer_pf_amount", totalPfAmount);
+                            map.put("total_amount", totalPfAmount.multiply(BigDecimal.valueOf(2)));
+                            map.put("pf_percentage", pfPercentage);
+                        } else {
+                            Integer totalBasicSalary = emp.getBasicSalary() * month;
+
+                            BigDecimal monthlyPfAmount = BigDecimal.valueOf(emp.getPfAmount());
+                            BigDecimal totalPfAmountForMonths = monthlyPfAmount.multiply(BigDecimal.valueOf(month));
+
+                            BigDecimal perDayPf = totalPfAmountForMonths
+                                    .divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
+
+                            BigDecimal pfAmount = perDayPf.multiply(BigDecimal.valueOf(daysWorked)).setScale(0, RoundingMode.HALF_UP); // Round final amount
+
+                            map.put("basic_salary", emp.getBasicSalary());
+                            map.put("total_basic_salary", totalBasicSalary);
+                            map.put("employee_pf_amount", pfAmount);
+                            map.put("employer_pf_amount", pfAmount);
+                            map.put("total_amount", pfAmount.multiply(BigDecimal.valueOf(2)));
+                            map.put("pf_amount", emp.getPfAmount());
                         }
+
+                        response.add(map);
                     }
 
-                    if (type.equals("PT") && companyEmployee.getIsPt()) {
-                       Integer totalBasicSalary = companyEmployee.getGrossSalary() * month;
-                       Integer totalPtAmount = companyEmployee.getPtAmount() * month;
+                    if ("PT".equals(type) && Boolean.TRUE.equals(emp.getIsPt())) {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("employeeId", empId);
+                        map.put("userName", emp.getUsername());
+                        map.put("daysWorked", daysWorked);
+                        map.put("totalDays", totalDays);
 
-                        res.put("gross_salary", companyEmployee.getGrossSalary());
-                        res.put("total_gross_salary", totalBasicSalary);
-                        res.put("pt_amount", totalPtAmount);
+                        Integer totalBasicSalary = emp.getGrossSalary() * month;
+                        BigDecimal monthlyPtAmount = BigDecimal.valueOf(emp.getPtAmount());
+                        BigDecimal totalPtAmountForMonths = monthlyPtAmount.multiply(BigDecimal.valueOf(month));
+                        BigDecimal perDayPt = totalPtAmountForMonths
+                                .divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
+
+                        BigDecimal ptAmount = perDayPt.multiply(BigDecimal.valueOf(daysWorked)).setScale(0, RoundingMode.HALF_UP); // Round final amount
+                        BigDecimal totalPtAmount = ptAmount.multiply(BigDecimal.valueOf(month));
+
+                        map.put("gross_salary", emp.getGrossSalary());
+                        map.put("total_gross_salary", totalBasicSalary);
+                        map.put("total_amount", totalPtAmount);
+                        map.put("pt_amount", emp.getPtAmount());
+
+                        response.add(map);
                     }
-                    response.add(res);
                 }
             }
+
             return response;
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
+
 
     @Override
     public List<Map<String, Object>> getAllEmployeeListByCompanyId(int companyId) {
@@ -133,8 +377,8 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 for (CompanyEmployee companyEmployee : companyEmployeeList) {
                     Map<String, Object> res = new HashMap<>();
                     CompanyEmployeeDto companyEmployeeDto = this.getEmployee(companyEmployee.getEmployeeId());
-                    res.put("employeeId",companyEmployeeDto.getEmployeeId());
-                    res.put("userName",companyEmployeeDto.getUserName());
+                    res.put("employeeId", companyEmployeeDto.getEmployeeId());
+                    res.put("userName", companyEmployeeDto.getUserName());
                     response.add(res);
                 }
             }
@@ -420,5 +664,21 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
+    }
+
+    private static List<java.sql.Date[]> getLastNMonthDateRanges(int monthCount) {
+        List<java.sql.Date[]> result = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+
+        for (int i = monthCount; i >= 1; i--) {
+            LocalDate start = today.minusMonths(i).withDayOfMonth(1);
+            LocalDate end = start.withDayOfMonth(start.lengthOfMonth());
+
+            result.add(new Date[]{
+                    java.sql.Date.valueOf(start),
+                    java.sql.Date.valueOf(end)
+            });
+        }
+        return result;
     }
 }
