@@ -335,25 +335,14 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
 
                     if ("PT".equals(type) && Boolean.TRUE.equals(emp.getIsPt())) {
                         Map<String, Object> map = new HashMap<>();
+                        int grossSalary = emp.getGrossSalary();
+                        int ptAmount = emp.getPtAmount();
+
                         map.put("employeeId", empId);
                         map.put("userName", emp.getUsername());
-                        map.put("daysWorked", daysWorked);
-                        map.put("totalDays", totalDays);
-
-                        Integer totalBasicSalary = emp.getGrossSalary() * month;
-                        BigDecimal monthlyPtAmount = BigDecimal.valueOf(emp.getPtAmount());
-                        BigDecimal totalPtAmountForMonths = monthlyPtAmount.multiply(BigDecimal.valueOf(month));
-                        BigDecimal perDayPt = totalPtAmountForMonths
-                                .divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
-
-                        BigDecimal ptAmount = perDayPt.multiply(BigDecimal.valueOf(daysWorked)).setScale(0, RoundingMode.HALF_UP); // Round final amount
-                        BigDecimal totalPtAmount = ptAmount.multiply(BigDecimal.valueOf(month));
-
-                        map.put("gross_salary", emp.getGrossSalary());
-                        map.put("total_gross_salary", totalBasicSalary);
-                        map.put("total_amount", totalPtAmount);
-                        map.put("pt_amount", emp.getPtAmount());
-
+                        map.put("gross_salary", grossSalary);
+                        map.put("total_gross_salary", grossSalary * month);
+                        map.put("pt_amount", ptAmount * month);
                         response.add(map);
                     }
                 }

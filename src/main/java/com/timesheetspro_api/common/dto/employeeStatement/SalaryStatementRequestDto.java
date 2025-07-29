@@ -9,4 +9,5 @@ public class SalaryStatementRequestDto {
     private List<Integer> employeeIds;
     private List<Integer> departmentIds;
     private Integer month;
+    private Integer year;
 }

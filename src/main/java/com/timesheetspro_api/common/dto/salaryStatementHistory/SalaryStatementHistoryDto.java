@@ -1,16 +1,16 @@
-package com.timesheetspro_api.common.dto.employeeStatement;
+package com.timesheetspro_api.common.dto.salaryStatementHistory;
 
 import lombok.Data;
 
 @Data
-public class EmployeeSalaryStatementDto {
+public class SalaryStatementHistoryDto {
+    private Integer id;
     private Integer companyId;
     private Integer employeeId;
     private String employeeName;
-    private Long departmentId;
+    private Integer departmentId;
     private String departmentName;
     private Integer basicSalary;
-    private Integer overTime;
     private Integer otAmount;
     private Integer pfAmount;
     private Integer totalPfAmount;
@@ -20,4 +20,5 @@ public class EmployeeSalaryStatementDto {
     private Integer otherDeductions;
     private Integer totalDeductions;
     private Integer netSalary;
+    private String month;
 }

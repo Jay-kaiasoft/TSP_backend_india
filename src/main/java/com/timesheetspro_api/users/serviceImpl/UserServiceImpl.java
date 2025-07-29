@@ -363,7 +363,7 @@ public class UserServiceImpl implements UserService {
                     CompanyEmployee companyEmployee = this.companyEmployeeRepository.findByCompanyNoAndUserName(companyDetails.getId(), loginDto.getUserName());
                     CompanyTheme companyTheme = this.companyThemeRepository.findByCompanyId(companyDetails.getId());
 
-                    if (!companyEmployee.getRoles().getRoleName().equals("Admin") && !companyEmployee.getRoles().getRoleName().equals("Owner")){
+                    if (!companyEmployee.getRoles().getRoleName().equals("Admin") && !companyEmployee.getRoles().getRoleName().equals("Owner") && companyEmployee.getCheckGeofence() == 1) {
                         if (!companyEmployee.getCompanyLocation().isEmpty()) {
                             String companyLocation = companyEmployee.getCompanyLocation().replaceAll("[\\[\\]]", ""); // Remove brackets
                             String[] parts = companyLocation.split(",");
