@@ -10,6 +10,7 @@ public class EmployeeSalaryStatementDto {
     private Long departmentId;
     private String departmentName;
     private Integer basicSalary;
+    private Integer totalEarnSalary;
     private Integer overTime;
     private Integer otAmount;
     private Integer pfAmount;
@@ -20,4 +21,6 @@ public class EmployeeSalaryStatementDto {
     private Integer otherDeductions;
     private Integer totalDeductions;
     private Integer netSalary;
+    private Integer totalDays;
+    private Integer totalWorkingDays;
 }

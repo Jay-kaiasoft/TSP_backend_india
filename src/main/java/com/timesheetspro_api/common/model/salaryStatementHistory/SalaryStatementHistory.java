@@ -34,6 +34,9 @@ public class SalaryStatementHistory {
     @Column(name = "basic_salary")
     private Integer basicSalary;
 
+    @Column(name = "total_earn_salary")
+    private Integer totalEarnSalary;
+
     @Column(name = "ot_amount")
     private Integer otAmount;
 
@@ -63,4 +66,10 @@ public class SalaryStatementHistory {
 
     @Column(name = "month", nullable = true)
     private String month;
+
+    @Column(name = "total_days")
+    private Integer totalDays;
+
+    @Column(name = "working_days")
+    private Integer totalWorkingDays;
 }

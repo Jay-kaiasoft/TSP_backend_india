@@ -23,7 +23,8 @@ public class SalaryStatementHistoryController {
     public ApiResponse<?> filterSalaryStatementHistory(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestBody Map<String, Object> requestBody) {
         List<Integer> employeeId = (List<Integer>) requestBody.get("employeeIds");
         List<Integer> departmentId = (List<Integer>) requestBody.get("departmentIds");
-        String month = (String) requestBody.get("month");
+        List<String> month = (List<String>) requestBody.get("month");
+
         Map<String, Object> resBody = new HashMap<>();
 
         try {

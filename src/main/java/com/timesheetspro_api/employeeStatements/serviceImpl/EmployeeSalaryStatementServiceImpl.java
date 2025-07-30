@@ -134,7 +134,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 workDays.add(date);
             }
         }
-
         long totalWorkedMinutes = totalWorkedMillis / (1000 * 60);
         long shiftMinutes = employeeShiftHours * 60L;
         long otMinutes = Math.max(totalWorkedMinutes - shiftMinutes, 0);
@@ -177,6 +176,8 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
         dto.setOverTime(otFinalMinutes);
         dto.setOtAmount(otAmountFinal);
+        dto.setTotalDays(totalDays.intValue());
+        dto.setTotalWorkingDays(workDays.size());
 
         // Calculate PF only if timeIn/out exists (userInOutList present)
         Integer pfAmount = 0;
@@ -190,7 +191,8 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 BigDecimal totalPfAmount = pfAmountPerDay.multiply(BigDecimal.valueOf(daysWorked)).setScale(0, RoundingMode.HALF_UP);
                 pfAmount = totalPfAmount.intValue();
                 dto.setPfPercentage(pfPercentage);
-            } else {
+            }
+            if ("Fixed Amount".equals(companyEmployee.getPfType())) {
                 Integer pfAmt = Optional.ofNullable(companyEmployee.getPfAmount()).orElse(0);
                 BigDecimal monthlyPfAmount = BigDecimal.valueOf(pfAmt);
 //                BigDecimal totalPfAmountForMonths = monthlyPfAmount.multiply(BigDecimal.valueOf(month));
@@ -209,7 +211,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         }
         dto.setPtAmount(ptAmount);
 
-        Integer totalEarnings = dto.getBasicSalary() + dto.getOtAmount();
+        Integer totalEarnings = 0;
         Integer totalDeductions = pfAmount + ptAmount;
         Integer otherDeductions = 0;
 
@@ -233,6 +235,9 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             totalDeductions += otherDeductions;
         }
 
+        Long dailySalary = companyEmployee.getBasicSalary() / totalDays;
+        dto.setTotalEarnSalary((int) (dailySalary * workDays.size()));
+        totalEarnings = (int) (dailySalary * workDays.size()) + otAmountFinal;
         Integer netSalary = totalEarnings - totalDeductions;
         dto.setOtherDeductions(otherDeductions);
         dto.setTotalEarnings(totalEarnings);
@@ -246,7 +251,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         List<Date[]> result = new ArrayList<>();
         LocalDate start = LocalDate.of(year, month, 1);
         LocalDate end = start.withDayOfMonth(start.lengthOfMonth());
-        result.add(new Date[]{ java.sql.Date.valueOf(start), java.sql.Date.valueOf(end) });
+        result.add(new Date[]{java.sql.Date.valueOf(start), java.sql.Date.valueOf(end)});
         return result;
     }
 

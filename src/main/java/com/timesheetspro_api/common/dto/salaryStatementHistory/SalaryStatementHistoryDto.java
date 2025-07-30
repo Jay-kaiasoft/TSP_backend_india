@@ -11,6 +11,7 @@ public class SalaryStatementHistoryDto {
     private Integer departmentId;
     private String departmentName;
     private Integer basicSalary;
+    private Integer totalEarnSalary;
     private Integer otAmount;
     private Integer pfAmount;
     private Integer totalPfAmount;
@@ -21,4 +22,6 @@ public class SalaryStatementHistoryDto {
     private Integer totalDeductions;
     private Integer netSalary;
     private String month;
+    private Integer totalDays;
+    private Integer totalWorkingDays;
 }

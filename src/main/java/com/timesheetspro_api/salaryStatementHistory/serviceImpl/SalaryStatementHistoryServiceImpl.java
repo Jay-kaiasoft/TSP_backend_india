@@ -24,7 +24,7 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
     private SalaryStatementHistoryRepository salaryStatementHistoryRepository;
 
     @Override
-    public List<SalaryStatementHistoryDto> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, String month) {
+    public List<SalaryStatementHistoryDto> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, List<String> month) {
         try {
             Specification<SalaryStatementHistory> spec = Specification.where(null);
             if (employeeId != null && !employeeId.isEmpty()) {

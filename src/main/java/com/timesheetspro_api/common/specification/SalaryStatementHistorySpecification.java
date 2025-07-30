@@ -16,7 +16,7 @@ public class SalaryStatementHistorySpecification {
                 root.get("departmentId").in(departmentIds);
     }
 
-    public static Specification<SalaryStatementHistory> hasMonth(String month) {
+    public static Specification<SalaryStatementHistory> hasMonth(List<String> month) {
         return (root, query, cb) ->
                 root.get("month").in(month);
     }
