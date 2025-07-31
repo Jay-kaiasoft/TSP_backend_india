@@ -12,10 +12,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service(value = "SalaryStatementHistoryService")
 public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistoryService {
@@ -24,31 +24,65 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
     private SalaryStatementHistoryRepository salaryStatementHistoryRepository;
 
     @Override
-    public List<SalaryStatementHistoryDto> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, List<String> month) {
+    public List<Map<String, Object>> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, List<String> month) {
         try {
+            boolean noFilters =
+                    (employeeId == null || employeeId.isEmpty()) &&
+                            (departmentId == null || departmentId.isEmpty()) &&
+                            (month == null || month.isEmpty());
+
+            if (noFilters) {
+                System.out.println("All filters are empty, returning empty list.");
+                return new ArrayList<>();
+            }
+
             Specification<SalaryStatementHistory> spec = Specification.where(null);
+
             if (employeeId != null && !employeeId.isEmpty()) {
                 spec = spec.and(SalaryStatementHistorySpecification.hasUserIds(employeeId));
             }
+
             if (departmentId != null && !departmentId.isEmpty()) {
                 spec = spec.and(SalaryStatementHistorySpecification.hasDepartmentIds(departmentId));
             }
+
             if (month != null && !month.isEmpty()) {
+                System.out.println("Filtering by month: " + month);
                 spec = spec.and(SalaryStatementHistorySpecification.hasMonth(month));
             }
-            List<SalaryStatementHistory> salaryStatementHistories = this.salaryStatementHistoryRepository.findAll(spec);
-            List<SalaryStatementHistoryDto> salaryStatementHistoryDtoList = new ArrayList<>();
 
-            if (!salaryStatementHistories.isEmpty()) {
-                for (SalaryStatementHistory salaryStatementHistory : salaryStatementHistories) {
-                    salaryStatementHistoryDtoList.add(this.getSalaryStatementHistory(salaryStatementHistory.getId()));
-                }
+            List<SalaryStatementHistory> salaryStatementHistories = this.salaryStatementHistoryRepository.findAll(spec);
+            List<SalaryStatementHistoryDto> dtoList = new ArrayList<>();
+
+            for (SalaryStatementHistory entity : salaryStatementHistories) {
+                dtoList.add(this.getSalaryStatementHistory(entity.getId()));
             }
-            return salaryStatementHistoryDtoList;
+
+            // Group by month
+            Map<String, List<SalaryStatementHistoryDto>> grouped = dtoList.stream()
+                    .collect(Collectors.groupingBy(SalaryStatementHistoryDto::getMonth));
+
+            // Build result without using DTO
+            List<Map<String, Object>> result = new ArrayList<>();
+
+            grouped.entrySet().stream()
+                    .sorted(Comparator.comparing(e -> parseMonthYear(e.getKey())))
+                    .forEach(entry -> {
+                        Map<String, Object> group = new HashMap<>();
+                        group.put("month", entry.getKey());
+                        group.put("data", entry.getValue());
+                        result.add(group);
+                    });
+
+            return result;
+
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
+
+
 
     @Override
     public SalaryStatementHistoryDto getSalaryStatementHistory(Integer id) {
@@ -111,4 +145,10 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
             throw new RuntimeException(e);
         }
     }
+
+    private YearMonth parseMonthYear(String monthYear) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMMM-yyyy", Locale.ENGLISH);
+        return YearMonth.parse(monthYear, formatter);
+    }
+
 }

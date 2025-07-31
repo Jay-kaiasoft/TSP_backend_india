@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class EmployeeDto {
     private int employeeId;
@@ -40,5 +42,5 @@ public class EmployeeDto {
     private String address2;
     private String roleName;
     private String companyLocation;
-
+    private List<CompanyEmployeeRolesDto> roles;
 }

@@ -7,7 +7,7 @@ import java.util.Map;
 
 public interface SalaryStatementHistoryService {
 
-    List<SalaryStatementHistoryDto> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, List<String> month);
+    List<Map<String, Object>> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, List<String> month);
 
     SalaryStatementHistoryDto getSalaryStatementHistory(Integer id);
 

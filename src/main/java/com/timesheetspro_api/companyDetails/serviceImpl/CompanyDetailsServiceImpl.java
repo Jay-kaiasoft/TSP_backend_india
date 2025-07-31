@@ -9,6 +9,7 @@ import com.timesheetspro_api.common.dto.location.LocationDto;
 import com.timesheetspro_api.common.exception.GlobalException;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
+import com.timesheetspro_api.common.model.companyEmployeeRoles.CompanyEmployeeRoles;
 import com.timesheetspro_api.common.model.companyTheme.CompanyTheme;
 import com.timesheetspro_api.common.model.locations.Locations;
 import com.timesheetspro_api.common.repository.company.CompanyDetailsRepository;
@@ -238,29 +239,62 @@ public class CompanyDetailsServiceImpl implements CompanyDetailsService {
                     }
                 }
                 if (!companyDetailsDto.getEmployees().isEmpty()) {
-                    for (CompanyEmployeeDto companyEmployeeDto : companyDetailsDto.getEmployees()) {
-                        // ====================== add employee role =================
-                        for (CompanyEmployeeRolesDto companyEmployeeRolesDto : companyDetailsDto.getRoles()) {
-                            CompanyEmployeeRolesDto rolesDto = new CompanyEmployeeRolesDto();
-                            if (!companyEmployeeRolesDto.getRoleName().equals(companyEmployeeDto.getRoleName())) {
-                                rolesDto.setCompanyId(companyDetails.getId());
-                                rolesDto.setRoleName(companyEmployeeRolesDto.getRoleName());
-                                rolesDto.setRolesActions(companyEmployeeRolesDto.getRolesActions());
-                                this.companyEmployeeRoleService.createRole(rolesDto);
-                            }
-                        }
-                        CompanyEmployeeRolesDto companyEmployeeRolesDto = new CompanyEmployeeRolesDto();
-                        companyEmployeeRolesDto.setCompanyId(companyDetails.getId());
-                        companyEmployeeRolesDto.setRoleName(companyEmployeeDto.getRoleName());
-                        companyEmployeeRolesDto.setRolesActions(companyDetailsDto.getRoles().get(companyDetailsDto.getRoles().size() - 1).getRolesActions());
-                        CompanyEmployeeRolesDto rolesDto = this.companyEmployeeRoleService.createRole(companyEmployeeRolesDto);
+                    List<CompanyEmployeeRolesDto> companyEmployeeRolesList = this.companyEmployeeRoleService.getAllRolesByCompanyId(companyDetails.getId());
+                    CompanyEmployeeRolesDto roles = null;
 
-                        // ====================== add employee =================
-                        EmployeeDto newCompanyEmployeeDto = new EmployeeDto();
-                        BeanUtils.copyProperties(companyEmployeeDto, newCompanyEmployeeDto);
-                        newCompanyEmployeeDto.setCompanyId(companyDetails.getId());
-                        newCompanyEmployeeDto.setRoleId(rolesDto.getRoleId());
-                        this.companyEmployeeService.createEmployeeFromTSP(newCompanyEmployeeDto);
+                    if (companyEmployeeRolesList.isEmpty()) {
+                        for (CompanyEmployeeDto companyEmployeeDto : companyDetailsDto.getEmployees()) {
+                            // ====================== add employee role =================
+                            for (CompanyEmployeeRolesDto companyEmployeeRolesDto : companyDetailsDto.getRoles()) {
+                                CompanyEmployeeRolesDto rolesDto = new CompanyEmployeeRolesDto();
+                                if (!companyEmployeeRolesDto.getRoleName().equals(companyEmployeeDto.getRoleName())) {
+                                    rolesDto.setCompanyId(companyDetails.getId());
+                                    rolesDto.setRoleName(companyEmployeeRolesDto.getRoleName());
+                                    rolesDto.setRolesActions(companyEmployeeRolesDto.getRolesActions());
+                                    this.companyEmployeeRoleService.createRole(rolesDto);
+                                }
+                            }
+                            CompanyEmployeeRolesDto companyEmployeeRolesDto = new CompanyEmployeeRolesDto();
+                            companyEmployeeRolesDto.setCompanyId(id);
+                            companyEmployeeRolesDto.setRoleName(companyEmployeeDto.getRoleName());
+                            companyEmployeeRolesDto.setRolesActions(companyDetailsDto.getRoles().get(companyDetailsDto.getRoles().size() - 1).getRolesActions());
+                            roles = this.companyEmployeeRoleService.createRole(companyEmployeeRolesDto);
+                            // ====================== add employee =================
+                            EmployeeDto newCompanyEmployeeDto = new EmployeeDto();
+                            newCompanyEmployeeDto.setCompanyId(id);
+                            newCompanyEmployeeDto.setRoleId(roles.getRoleId());
+                            newCompanyEmployeeDto.setFirstName(companyEmployeeDto.getFirstName());
+                            newCompanyEmployeeDto.setLastName(companyEmployeeDto.getLastName());
+                            newCompanyEmployeeDto.setEmail(companyEmployeeDto.getEmail());
+                            newCompanyEmployeeDto.setPhone(companyEmployeeDto.getPhone());
+                            newCompanyEmployeeDto.setAddress1(companyEmployeeDto.getAddress1());
+                            newCompanyEmployeeDto.setCity(companyEmployeeDto.getCity());
+                            newCompanyEmployeeDto.setState(companyEmployeeDto.getState());
+                            newCompanyEmployeeDto.setCountry(companyEmployeeDto.getCountry());
+                            newCompanyEmployeeDto.setUserName(companyEmployeeDto.getUserName());
+                            newCompanyEmployeeDto.setPassword(companyEmployeeDto.getPassword());
+                            newCompanyEmployeeDto.setRoles(companyDetailsDto.getRoles());
+                            this.companyEmployeeService.createEmployeeFromTSP(newCompanyEmployeeDto);
+                        }
+                    } else {
+                        for (CompanyEmployeeDto companyEmployeeDto : companyDetailsDto.getEmployees()) {
+                            // ====================== add employee =================
+                            EmployeeDto newCompanyEmployeeDto = new EmployeeDto();
+                            newCompanyEmployeeDto.setCompanyId(id);
+                            newCompanyEmployeeDto.setRoleId(roles.getRoleId());
+                            newCompanyEmployeeDto.setFirstName(companyEmployeeDto.getFirstName());
+                            newCompanyEmployeeDto.setLastName(companyEmployeeDto.getLastName());
+                            newCompanyEmployeeDto.setEmail(companyEmployeeDto.getEmail());
+                            newCompanyEmployeeDto.setPhone(companyEmployeeDto.getPhone());
+                            newCompanyEmployeeDto.setAddress1(companyEmployeeDto.getAddress1());
+                            newCompanyEmployeeDto.setCity(companyEmployeeDto.getCity());
+                            newCompanyEmployeeDto.setState(companyEmployeeDto.getState());
+                            newCompanyEmployeeDto.setCountry(companyEmployeeDto.getCountry());
+                            newCompanyEmployeeDto.setUserName(companyEmployeeDto.getUserName());
+                            newCompanyEmployeeDto.setPassword(companyEmployeeDto.getPassword());
+                            newCompanyEmployeeDto.setRoles(companyDetailsDto.getRoles());
+                            this.companyEmployeeService.createEmployeeFromTSP(newCompanyEmployeeDto);
+                        }
                     }
                 }
                 companyDetailsDto.setId(companyDetails.getId());
