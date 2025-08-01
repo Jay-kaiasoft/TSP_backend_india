@@ -28,4 +28,7 @@ public interface UserInOutRepository extends JpaRepository<UserInOut, Long>, Jpa
 
     @Query("SELECT u FROM UserInOut u WHERE u.timeOut IS NOT NULL AND u.user.id=:userId")
     List<UserInOut> getAllRecordsByUsers(@Param("userId") int userId);
+
+    @Query("SELECT u FROM UserInOut u WHERE u.timeOut IS NULL AND u.user.id=:userId")
+    UserInOut getCurrentUserRecord(@Param("userId") int userId);
 }

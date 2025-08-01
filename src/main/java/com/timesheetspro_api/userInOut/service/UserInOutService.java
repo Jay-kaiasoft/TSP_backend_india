@@ -29,4 +29,6 @@ public interface UserInOutService {
 
     Workbook generateExcelReport(Map<String, Object> data, String startDate, String endDate, String timeZone);
 
+    String clickInOut(int userId,Integer locationId);
+
 }

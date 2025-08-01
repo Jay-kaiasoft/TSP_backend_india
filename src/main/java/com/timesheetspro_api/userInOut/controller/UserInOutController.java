@@ -107,12 +107,12 @@ public class UserInOutController {
     }
 
     @GetMapping("/getAllRecords")
-    public ApiResponse<?> getAllEntriesByUserId(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestParam(value = "userIds", required = false) List<Integer> userIds, @RequestParam(value = "startDate", required = false) String startDate, @RequestParam(value = "endDate", required = false) String endDate, @RequestParam(value = "timeZone", required = false) String timeZone, @RequestParam(value = "locationIds", required = false) List<Integer> locationIds,@RequestParam(value = "departmentIds", required = false) List<Integer> departmentIds) {
+    public ApiResponse<?> getAllEntriesByUserId(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestParam(value = "userIds", required = false) List<Integer> userIds, @RequestParam(value = "startDate", required = false) String startDate, @RequestParam(value = "endDate", required = false) String endDate, @RequestParam(value = "timeZone", required = false) String timeZone, @RequestParam(value = "locationIds", required = false) List<Integer> locationIds, @RequestParam(value = "departmentIds", required = false) List<Integer> departmentIds) {
         Map<String, Object> resBody = new HashMap<>();
         try {
             String token = authorizationHeader.substring(7);
             Long userId = jwtService.extractUserId(token);
-            return new ApiResponse<>(HttpStatus.OK.value(), "UserInOut fetched successfully", this.userInOutService.getAllEntriesByUserId(userIds, startDate, endDate, timeZone, locationIds,departmentIds));
+            return new ApiResponse<>(HttpStatus.OK.value(), "UserInOut fetched successfully", this.userInOutService.getAllEntriesByUserId(userIds, startDate, endDate, timeZone, locationIds, departmentIds));
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to get userInOut", resBody);
         }
@@ -164,7 +164,6 @@ public class UserInOutController {
         }
     }
 
-
     @PutMapping("/update/{id}")
     public ApiResponse<?> updateUserInOut(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @PathVariable String id) {
         Map<String, Object> resBody = new HashMap<>();
@@ -190,6 +189,38 @@ public class UserInOutController {
             return new ApiResponse<>(HttpStatus.OK.value(), "UserInOut updated successfully", "");
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to update userInOut details", resBody);
+        }
+    }
+
+    @PostMapping("/clockInOut")
+    public ApiResponse<?> createUserInOutFromApplication(
+            @RequestParam(value = "employeeId", required = false) String employeeId,
+            @RequestParam(value = "locationId", required = false) String locationId
+    ) {
+        Map<String, Object> resBody = new HashMap<>();
+        try {
+            System.out.println("=========== employeeId: " + employeeId);
+            System.out.println("=========== locationId: " + locationId);
+            Integer parsedLocationId = (locationId != null && !locationId.isBlank() && !"undefined".equals(locationId))
+                    ? Integer.parseInt(locationId)
+                    : null;
+
+            String res = this.userInOutService.clickInOut(Integer.parseInt(employeeId), parsedLocationId);
+            if (res.equals("created")) {
+                return new ApiResponse<>(
+                        HttpStatus.CREATED.value(),
+                        "Clock In successfully",
+                        ""
+                );
+            } else {
+                return new ApiResponse<>(
+                        HttpStatus.OK.value(),
+                        "Clock Out successfully",
+                        ""
+                );
+            }
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to create userInOut", resBody);
         }
     }
 }

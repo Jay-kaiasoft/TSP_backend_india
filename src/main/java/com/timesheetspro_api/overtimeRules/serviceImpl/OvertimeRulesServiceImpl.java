@@ -90,7 +90,6 @@ public class OvertimeRulesServiceImpl implements OvertimeRulesService {
             overtimeRules.setOtType(overtimeRulesDto.getOtType());
             overtimeRules.setStartTime(overtimeRulesDto.getStartTime());
             overtimeRules.setEndTime(overtimeRulesDto.getEndTime());
-            overtimeRules.setUserIds(overtimeRulesDto.getUserIds());
             OvertimeRules savedOvertimeRules = this.overtimeRulesRepository.save(overtimeRules);
             OvertimeRulesDto savedOvertimeRulesDto = new OvertimeRulesDto();
             BeanUtils.copyProperties(savedOvertimeRules, savedOvertimeRulesDto);
@@ -106,17 +105,6 @@ public class OvertimeRulesServiceImpl implements OvertimeRulesService {
         try {
             OvertimeRules overtimeRules = this.overtimeRulesRepository.findById(id).orElseThrow(() -> new RuntimeException("Overtime rule not found"));
             this.overtimeRulesRepository.delete(overtimeRules);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    public void assignOvertimeRuleToEmployee(int overtimeRuleId, OvertimeRulesDto overtimeRulesDto) {
-        try {
-            OvertimeRules overtimeRules = this.overtimeRulesRepository.findById(overtimeRuleId).orElseThrow(() -> new RuntimeException("Overtime rule not found"));
-            overtimeRules.setUserIds(overtimeRulesDto.getUserIds());
-            this.overtimeRulesRepository.save(overtimeRules);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

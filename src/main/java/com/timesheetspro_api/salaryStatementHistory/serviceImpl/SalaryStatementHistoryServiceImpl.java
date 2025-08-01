@@ -1,7 +1,5 @@
 package com.timesheetspro_api.salaryStatementHistory.serviceImpl;
 
-import com.timesheetspro_api.common.dto.employeeStatement.EmployeeSalaryStatementDto;
-import com.timesheetspro_api.common.dto.employeeStatement.SalaryStatementRequestDto;
 import com.timesheetspro_api.common.dto.salaryStatementHistory.SalaryStatementHistoryDto;
 import com.timesheetspro_api.common.model.salaryStatementHistory.SalaryStatementHistory;
 import com.timesheetspro_api.common.repository.company.SalaryStatementHistoryRepository;
@@ -47,7 +45,6 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
             }
 
             if (month != null && !month.isEmpty()) {
-                System.out.println("Filtering by month: " + month);
                 spec = spec.and(SalaryStatementHistorySpecification.hasMonth(month));
             }
 
@@ -81,8 +78,6 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
             throw new RuntimeException(e);
         }
     }
-
-
 
     @Override
     public SalaryStatementHistoryDto getSalaryStatementHistory(Integer id) {

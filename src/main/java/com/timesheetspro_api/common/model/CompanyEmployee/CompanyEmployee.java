@@ -6,6 +6,7 @@ import com.timesheetspro_api.common.model.companyEmployeeRoles.CompanyEmployeeRo
 import com.timesheetspro_api.common.model.companyShift.CompanyShift;
 import com.timesheetspro_api.common.model.department.Department;
 import com.timesheetspro_api.common.model.employeeType.EmployeeType;
+import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -170,6 +171,10 @@ public class CompanyEmployee implements UserDetails {
 
     @Column(name = "canteen_amount", nullable = true)
     private Integer canteenAmount;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ot_id ", referencedColumnName = "id")
+    private OvertimeRules overtimeRules;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

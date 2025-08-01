@@ -93,7 +93,7 @@ public class UserInOutServiceImpl implements UserInOutService {
     }
 
     @Override
-    public List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone,List<Integer> locationIds,List<Integer> departmentIds) {
+    public List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds) {
         try {
 
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
@@ -136,7 +136,7 @@ public class UserInOutServiceImpl implements UserInOutService {
                         if (userInOut.getTimeOut() != null) {
                             dto.setTimeOut(this.commonService.convertDateToString(userInOut.getTimeOut()));
                         }
-                        if (userInOut.getLocations() != null){
+                        if (userInOut.getLocations() != null) {
                             dto.setLocationId(userInOut.getLocations().getId());
                         }
                         dto.setUserId(userInOut.getUser().getEmployeeId());
@@ -168,7 +168,7 @@ public class UserInOutServiceImpl implements UserInOutService {
                 userInOutDto.setUserId(userInOut.getUser().getEmployeeId());
 
                 userInOutDto.setTimeIn(this.commonService.convertDateToString(userInOut.getTimeIn()));
-                if (userInOut.getLocations() != null){
+                if (userInOut.getLocations() != null) {
                     userInOutDto.setLocationId(userInOut.getLocations().getId());
                 }
                 BeanUtils.copyProperties(userInOut, userInOutDto);
@@ -191,7 +191,7 @@ public class UserInOutServiceImpl implements UserInOutService {
             if (userInOut.getTimeOut() != null) {
                 userInOutDto.setTimeOut(this.commonService.convertDateToString(userInOut.getTimeOut()));
             }
-            if (userInOut.getLocations() != null){
+            if (userInOut.getLocations() != null) {
                 userInOutDto.setLocationId(userInOut.getLocations().getId());
             }
             return userInOutDto;
@@ -201,7 +201,7 @@ public class UserInOutServiceImpl implements UserInOutService {
         }
     }
 
-    public UserInOutDto createUserInOut(int userId,Integer locationId) {
+    public UserInOutDto createUserInOut(int userId, Integer locationId) {
         try {
             UserInOut userInOut = new UserInOut();
             CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userId)
@@ -211,8 +211,8 @@ public class UserInOutServiceImpl implements UserInOutService {
             Date currentDate = new Date();
             userInOut.setTimeIn(currentDate);
             userInOut.setCreatedOn(currentDate);
-            if (locationId != null){
-                Locations locations = this.locationsRepository.findById(locationId).orElseThrow(()-> new RuntimeException("Location not found"));
+            if (locationId != null) {
+                Locations locations = this.locationsRepository.findById(locationId).orElseThrow(() -> new RuntimeException("Location not found"));
                 if (locations != null) {
                     userInOut.setLocations(locations);
                 }
@@ -279,7 +279,6 @@ public class UserInOutServiceImpl implements UserInOutService {
             throw new RuntimeException(e.getMessage());
         }
     }
-
 
     public List<UserInOutDto> getTodayEntriesByUserId(int userId) {
         // Get the current date
@@ -480,6 +479,23 @@ public class UserInOutServiceImpl implements UserInOutService {
             e.printStackTrace();
         }
         return null;
+    }
+
+    @Override
+    public String clickInOut(int userId, Integer locationId) {
+        try {
+            UserInOut isExisting = this.userInOutRepository.getCurrentUserRecord(userId);
+            if (isExisting != null) {
+                this.updateUserInOut(isExisting.getId(), userId);
+                return "updated";
+            } else {
+                this.createUserInOut(userId, locationId);
+                return "created";
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
     }
 
     private Set<String> generateMonthKeys(Date startDate, Date endDate, SimpleDateFormat monthFormat) {

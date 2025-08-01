@@ -81,7 +81,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             }
             chain.doFilter(req, res);
 
-        } else if (requestUri.contains("/getTimezones") || requestUri.contains("/user/uploadProfileImage") || requestUri.contains("/uploadFile") || requestUri.contains("/user/generateResetLink") || requestUri.contains("/user/validateToken") || requestUri.contains("/user/resetPassword") || requestUri.contains("/user/create") || requestUri.contains("/user/login")) {
+        } else if (requestUri.contains("/getTimezones") || requestUri.contains("/user/uploadProfileImage") || requestUri.contains("/uploadFile") || requestUri.contains("/user/generateResetLink") || requestUri.contains("/user/validateToken") || requestUri.contains("/user/resetPassword") || requestUri.contains("/user/create") || requestUri.contains("/user/login") || requestUri.contains("/inout/clockInOut")) {
             chain.doFilter(req, res);
         } else {
             log.error("Invalid request URI : " + requestUri);

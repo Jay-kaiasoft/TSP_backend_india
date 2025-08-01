@@ -35,9 +35,6 @@ public class OvertimeRules {
     @Column(name = "ot_type")
     private String otType;
 
-    @Column(name = "user_ids")
-    private String userIds;
-
     @Column(name = "start_time")
     private Timestamp startTime;
 

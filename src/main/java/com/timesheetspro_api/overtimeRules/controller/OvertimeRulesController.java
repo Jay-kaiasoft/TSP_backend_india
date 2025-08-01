@@ -72,15 +72,4 @@ public class OvertimeRulesController {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
         }
     }
-
-    @PostMapping("/assignOvertimeRuleToEmployee/{id}")
-    public ApiResponse<?> assignOvertimeRuleToEmployee(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @PathVariable Integer id, @RequestBody OvertimeRulesDto overtimeRulesDto) {
-        Map<String, Object> resBody = new HashMap<>();
-        try {
-            this.overtimeRulesService.assignOvertimeRuleToEmployee(id, overtimeRulesDto);
-            return new ApiResponse<>(HttpStatus.OK.value(), "Overtime rule assigned successfully", "");
-        } catch (Exception e) {
-            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
-        }
-    }
 }

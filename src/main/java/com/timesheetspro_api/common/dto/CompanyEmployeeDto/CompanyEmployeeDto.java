@@ -76,6 +76,7 @@ public class CompanyEmployeeDto {
     private Integer grossSalary;
     private String canteenType;
     private Integer canteenAmount;
+    private Integer otId;
 
     private CompanyShiftDto companyShiftDto;
     private EmployeeBackAccountInfoDTO employeeBackAccountInfoDTO;

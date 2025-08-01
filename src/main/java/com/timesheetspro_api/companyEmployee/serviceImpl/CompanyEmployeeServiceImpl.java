@@ -12,7 +12,9 @@ import com.timesheetspro_api.common.model.companyShift.CompanyShift;
 import com.timesheetspro_api.common.model.department.Department;
 import com.timesheetspro_api.common.model.employeeBackAccountInfo.EmployeeBackAccountInfo;
 import com.timesheetspro_api.common.model.employeeType.EmployeeType;
+import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
 import com.timesheetspro_api.common.repository.DepartmentRepository;
+import com.timesheetspro_api.common.repository.OvertimeRulesRepository;
 import com.timesheetspro_api.common.repository.UserInOutRepository;
 import com.timesheetspro_api.common.repository.company.*;
 import com.timesheetspro_api.common.service.CommonService;
@@ -71,6 +73,9 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
 
     @Autowired
     private CompanyEmployeeRoleService companyEmployeeRoleService;
+
+    @Autowired
+    private OvertimeRulesRepository overtimeRulesRepository;
 
     @Override
     public List<Map<String, Object>> getReports(int companyId, String type, int month) {
@@ -293,7 +298,12 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
             if (companyEmployeeDto.getDob() != null) {
                 companyEmployee.setDob(this.commonService.convertStringToDate(companyEmployeeDto.getDob()));
             }
-
+            if (companyEmployeeDto.getOtId() != null) {
+                OvertimeRules overtimeRules = this.overtimeRulesRepository.findById(companyEmployeeDto.getOtId()).orElseThrow(() -> new RuntimeException("Overtime rule not found"));
+                companyEmployee.setOvertimeRules(overtimeRules);
+            } else {
+                companyEmployee.setOvertimeRules(null);
+            }
             companyEmployee.setCompanyDetails(companyDetails);
             companyEmployee.setRoles(companyEmployeeRoles);
             companyEmployee.setDepartment(department);
@@ -330,6 +340,13 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
             }
             if (companyEmployeeDto.getDob() != null) {
                 companyEmployee.setDob(this.commonService.convertStringToDate(companyEmployeeDto.getDob()));
+            }
+
+            if (companyEmployeeDto.getOtId() != null) {
+                OvertimeRules overtimeRules = this.overtimeRulesRepository.findById(companyEmployeeDto.getOtId()).orElseThrow(() -> new RuntimeException("Overtime rule not found"));
+                companyEmployee.setOvertimeRules(overtimeRules);
+            } else {
+                companyEmployee.setOvertimeRules(null);
             }
 
             companyEmployee.setCompanyShift(companyShift);

@@ -35,7 +35,7 @@ public class SecurityConfigurer {
         http.csrf(AbstractHttpConfigurer::disable)
                 .cors(corsCustomizer -> corsCustomizer.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers("/getTimezones","/uploadFile","/user/uploadProfileImage", "/user/login", "/user/resetPassword", "user/validateToken", "user/generateResetLink", "/user/create").permitAll()
+                        .requestMatchers("/inout/clockInOut", "/getTimezones", "/uploadFile", "/user/uploadProfileImage", "/user/login", "/user/resetPassword", "user/validateToken", "user/generateResetLink", "/user/create").permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(this.jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)

@@ -15,6 +15,4 @@ public interface OvertimeRulesService {
     OvertimeRulesDto updateOvertimeRule(int id, OvertimeRulesDto overtimeRulesDto);
 
     void deleteOvertimeRule(int id);
-
-    void assignOvertimeRuleToEmployee(int overtimeRuleId,OvertimeRulesDto overtimeRulesDto);
 }
