@@ -36,11 +36,12 @@ public class UserInOutController {
             @RequestParam(value = "userIds", required = false) List<Integer> userIds,
             @RequestParam(value = "startDate", required = false) String startDate,
             @RequestParam(value = "endDate", required = false) String endDate,
-            @RequestParam(value = "timeZone", required = false) String timeZone
+            @RequestParam(value = "timeZone", required = false) String timeZone,
+            @RequestParam(value = "companyId", required = false) String companyId
     ) {
         Map<String, Object> resBody = new HashMap<>();
         try {
-            resBody = this.userInOutService.getTimeInOutReport(userIds, startDate, endDate, timeZone);
+            resBody = this.userInOutService.getTimeInOutReport(userIds, startDate, endDate, timeZone, Integer.parseInt(companyId));
             return new ApiResponse<>(HttpStatus.OK.value(), "InOut's Report fetched successfully", resBody);
         } catch (Exception e) {
             e.printStackTrace();
@@ -55,12 +56,14 @@ public class UserInOutController {
             @RequestParam(value = "userIds", required = false) List<Integer> userIds,
             @RequestParam(value = "startDate", required = false) String startDate,
             @RequestParam(value = "endDate", required = false) String endDate,
-            @RequestParam(value = "timeZone", required = false) String timeZone
+            @RequestParam(value = "timeZone", required = false) String timeZone,
+            @RequestParam(value = "companyId", required = false) Integer companyId
+
     ) {
         try {
             // Generate the Excel file
             Workbook workbook = this.userInOutService.generateExcelReport(
-                    this.userInOutService.getTimeInOutReport(userIds, startDate, endDate, timeZone), startDate, endDate, timeZone);
+                    this.userInOutService.getTimeInOutReport(userIds, startDate, endDate, timeZone, companyId), startDate, endDate, timeZone);
 
             // Write to ByteArrayOutputStream
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -107,12 +110,12 @@ public class UserInOutController {
     }
 
     @GetMapping("/getAllRecords")
-    public ApiResponse<?> getAllEntriesByUserId(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestParam(value = "userIds", required = false) List<Integer> userIds, @RequestParam(value = "startDate", required = false) String startDate, @RequestParam(value = "endDate", required = false) String endDate, @RequestParam(value = "timeZone", required = false) String timeZone, @RequestParam(value = "locationIds", required = false) List<Integer> locationIds, @RequestParam(value = "departmentIds", required = false) List<Integer> departmentIds) {
+    public ApiResponse<?> getAllEntriesByUserId(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestParam(value = "userIds", required = false) List<Integer> userIds, @RequestParam(value = "startDate", required = false) String startDate, @RequestParam(value = "endDate", required = false) String endDate, @RequestParam(value = "timeZone", required = false) String timeZone, @RequestParam(value = "locationIds", required = false) List<Integer> locationIds, @RequestParam(value = "departmentIds", required = false) List<Integer> departmentIds, @RequestParam(value = "companyId", required = false) Integer companyId) {
         Map<String, Object> resBody = new HashMap<>();
         try {
             String token = authorizationHeader.substring(7);
             Long userId = jwtService.extractUserId(token);
-            return new ApiResponse<>(HttpStatus.OK.value(), "UserInOut fetched successfully", this.userInOutService.getAllEntriesByUserId(userIds, startDate, endDate, timeZone, locationIds, departmentIds));
+            return new ApiResponse<>(HttpStatus.OK.value(), "UserInOut fetched successfully", this.userInOutService.getAllEntriesByUserId(userIds, startDate, endDate, timeZone, locationIds, departmentIds, companyId));
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to get userInOut", resBody);
         }
@@ -143,7 +146,8 @@ public class UserInOutController {
     @PostMapping("/create")
     public ApiResponse<?> createUserInOut(
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
-            @RequestParam(value = "locationId", required = false) String locationId
+            @RequestParam(value = "locationId", required = false) String locationId,
+            @RequestParam(value = "companyId", required = false) String companyId
     ) {
         Map<String, Object> resBody = new HashMap<>();
         try {
@@ -153,11 +157,14 @@ public class UserInOutController {
             Integer parsedLocationId = (locationId != null && !locationId.isBlank() && !"undefined".equals(locationId))
                     ? Integer.parseInt(locationId)
                     : null;
+            Integer parsedCompanyId = (companyId != null && !companyId.isBlank() && !"undefined".equals(companyId))
+                    ? Integer.parseInt(companyId)
+                    : null;
 
             return new ApiResponse<>(
                     HttpStatus.CREATED.value(),
                     "UserInOut added successfully",
-                    this.userInOutService.createUserInOut(userId.intValue(), parsedLocationId)
+                    this.userInOutService.createUserInOut(userId.intValue(), parsedLocationId, parsedCompanyId)
             );
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to create userInOut", resBody);
@@ -195,17 +202,16 @@ public class UserInOutController {
     @PostMapping("/clockInOut")
     public ApiResponse<?> createUserInOutFromApplication(
             @RequestParam(value = "employeeId", required = false) String employeeId,
-            @RequestParam(value = "locationId", required = false) String locationId
+            @RequestParam(value = "locationId", required = false) String locationId,
+            @RequestParam(value = "companyId", required = false) String companyId
     ) {
         Map<String, Object> resBody = new HashMap<>();
         try {
-            System.out.println("=========== employeeId: " + employeeId);
-            System.out.println("=========== locationId: " + locationId);
             Integer parsedLocationId = (locationId != null && !locationId.isBlank() && !"undefined".equals(locationId))
                     ? Integer.parseInt(locationId)
                     : null;
 
-            String res = this.userInOutService.clickInOut(Integer.parseInt(employeeId), parsedLocationId);
+            String res = this.userInOutService.clickInOut(Integer.parseInt(employeeId), parsedLocationId, Integer.parseInt(companyId));
             if (res.equals("created")) {
                 return new ApiResponse<>(
                         HttpStatus.CREATED.value(),

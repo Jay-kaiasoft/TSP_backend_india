@@ -1,6 +1,7 @@
 package com.timesheetspro_api.common.model.UserInOut;
 
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
+import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
 import com.timesheetspro_api.common.model.locations.Locations;
 import com.timesheetspro_api.common.model.users.Users;
 import jakarta.persistence.*;
@@ -37,4 +38,8 @@ public class UserInOut {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "location_id", referencedColumnName = "id")
     private Locations locations;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", referencedColumnName = "id")
+    private CompanyDetails companyDetails;
 }

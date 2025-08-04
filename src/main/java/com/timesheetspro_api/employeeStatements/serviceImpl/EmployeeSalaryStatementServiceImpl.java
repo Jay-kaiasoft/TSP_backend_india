@@ -41,6 +41,8 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         try {
             List<EmployeeSalaryStatementDto> salaryStatementList = new ArrayList<>();
             List<CompanyEmployee> companyEmployees;
+            Specification<CompanyEmployee> spec = Specification.where(null);
+            spec.and(EmployeeStatementSpecification.hasCompanyId(salaryStatementRequestDto.getCompanyId()));
 
             boolean hasEmployeeFilter = salaryStatementRequestDto.getEmployeeIds() != null && !salaryStatementRequestDto.getEmployeeIds().isEmpty();
             boolean hasDepartmentFilter = salaryStatementRequestDto.getDepartmentIds() != null && !salaryStatementRequestDto.getDepartmentIds().isEmpty();
@@ -48,7 +50,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             if (!hasEmployeeFilter && !hasDepartmentFilter) {
                 companyEmployees = this.companyEmployeeRepository.findAll();
             } else {
-                Specification<CompanyEmployee> spec = Specification.where(null);
 
                 if (hasEmployeeFilter) {
                     spec = spec.and(EmployeeStatementSpecification.hasEmployeeIds(salaryStatementRequestDto.getEmployeeIds()));
@@ -86,14 +87,15 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         if (companyEmployee.getBasicSalary() != null) {
             dto.setBasicSalary(companyEmployee.getBasicSalary());
         }
-
-        dto.setDepartmentId(companyEmployee.getDepartment().getId());
-        dto.setDepartmentName(companyEmployee.getDepartment().getDepartmentName());
+        if (companyEmployee.getDepartment() != null) {
+            dto.setDepartmentId(companyEmployee.getDepartment().getId());
+            dto.setDepartmentName(companyEmployee.getDepartment().getDepartmentName());
+        }
 
         Integer otAmountFinal = 0;
         Integer otFinalMinutes = 0;
         long totalWorkedMillis = 0;
-        Integer employeeShiftHours = companyEmployee.getCompanyShift().getTotalHours();
+        Integer employeeShiftHours = companyEmployee.getCompanyShift() != null ? companyEmployee.getCompanyShift().getTotalHours() : 0;
 
         List<Date[]> dateRanges = getDateRangeForYearAndMonth(year, month);
         Specification<UserInOut> userSpec = Specification.where(EmployeeStatementSpecification.hasUserIds(List.of(employeeId)));

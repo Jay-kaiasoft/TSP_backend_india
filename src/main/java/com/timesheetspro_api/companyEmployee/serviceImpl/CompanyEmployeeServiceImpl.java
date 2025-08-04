@@ -19,6 +19,7 @@ import com.timesheetspro_api.common.repository.UserInOutRepository;
 import com.timesheetspro_api.common.repository.company.*;
 import com.timesheetspro_api.common.service.CommonService;
 import com.timesheetspro_api.common.specification.EmployeeStatementSpecification;
+import com.timesheetspro_api.common.specification.UserInOutSpecification;
 import com.timesheetspro_api.companyEmployee.service.CompanyEmployeeService;
 import com.timesheetspro_api.companyEmployeeRole.service.CompanyEmployeeRoleService;
 import org.springframework.beans.BeanUtils;
@@ -83,6 +84,8 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
             List<Map<String, Object>> response = new ArrayList<>();
             List<Date[]> dateRanges = getLastNMonthDateRanges(month);
             Specification<UserInOut> dateSpec = Specification.where(null);
+            dateSpec.and(UserInOutSpecification.hasCompany(companyId));
+
             Long totalDays = 0L;
 
             for (Date[] range : dateRanges) {
@@ -97,7 +100,6 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
             List<UserInOut> userInOutList = this.userInOutRepository.findAll(dateSpec);
 
             Map<Integer, Set<LocalDate>> employeeWorkDays = new HashMap<>();
-
             for (UserInOut userInOut : userInOutList) {
                 CompanyEmployee employee = userInOut.getUser();
                 if (employee == null) continue;
@@ -106,15 +108,12 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 LocalDate workDate = ((java.sql.Date) userInOut.getCreatedOn()).toLocalDate();
                 employeeWorkDays.computeIfAbsent(empId, k -> new HashSet<>()).add(workDate);
             }
-
             for (Map.Entry<Integer, Set<LocalDate>> entry : employeeWorkDays.entrySet()) {
                 Integer empId = entry.getKey();
                 int daysWorked = entry.getValue().size();
-
                 Optional<CompanyEmployee> employeeOpt = this.companyEmployeeRepository.findById(empId);
                 if (employeeOpt.isPresent()) {
                     CompanyEmployee emp = employeeOpt.get();
-
                     if ("PF".equals(type) && Boolean.TRUE.equals(emp.getIsPf())) {
                         Map<String, Object> map = new HashMap<>();
                         map.put("employeeId", empId);
@@ -160,7 +159,6 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                             map.put("total_amount", pfAmount.multiply(BigDecimal.valueOf(2)));
                             map.put("pf_amount", emp.getPfAmount());
                         }
-
                         response.add(map);
                     }
 

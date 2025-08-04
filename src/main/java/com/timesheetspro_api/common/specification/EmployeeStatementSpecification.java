@@ -42,4 +42,9 @@ public class EmployeeStatementSpecification {
         return (root, query, cb) ->
                 root.get("id").in(employeeIds);
     }
+
+    public static Specification<CompanyEmployee> hasCompanyId(Integer companyId) {
+        return (root, query, cb) ->
+                root.get("companyDetails").get("id").in(companyId);
+    }
 }

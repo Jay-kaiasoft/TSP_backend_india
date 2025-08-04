@@ -11,13 +11,13 @@ public interface UserInOutService {
 
     Map<String, Object> dashboardCounts(int companyId);
 
-    List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds,String startDate, String endDate,String timeZone,List<Integer> locationIds,List<Integer> departmentIds);
+    List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds,Integer companyId);
 
     UserInOutDto getUserLastInOut(int id);
 
     UserInOutDto getUserInOut(Long id);
 
-    UserInOutDto createUserInOut(int userId,Integer locationId);
+    UserInOutDto createUserInOut(int userId, Integer locationId, Integer parsedCompanyId);
 
     void updateUserInOut(Long id, int userId);
 
@@ -25,10 +25,10 @@ public interface UserInOutService {
 
     List<UserInOutDto> getTodayEntriesByUserId(int userId);
 
-    Map<String, Object> getTimeInOutReport(List<Integer> userIds, String startDate, String endDate, String timeZone);
+    Map<String, Object> getTimeInOutReport(List<Integer> userIds, String startDate, String endDate, String timeZone,Integer companyId);
 
     Workbook generateExcelReport(Map<String, Object> data, String startDate, String endDate, String timeZone);
 
-    String clickInOut(int userId,Integer locationId);
+    String clickInOut(int userId, Integer locationId,Integer companyId);
 
 }

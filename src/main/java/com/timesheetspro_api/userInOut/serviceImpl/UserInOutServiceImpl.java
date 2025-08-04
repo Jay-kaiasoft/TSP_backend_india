@@ -4,10 +4,12 @@ import com.timesheetspro_api.common.dto.UserInOut.UserInOutDto;
 import com.timesheetspro_api.common.dto.companyShiftDto.CompanyShiftDto;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.UserInOut.UserInOut;
+import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
 import com.timesheetspro_api.common.model.companyShift.CompanyShift;
 import com.timesheetspro_api.common.model.locations.Locations;
 import com.timesheetspro_api.common.repository.UserInOutRepository;
 import com.timesheetspro_api.common.repository.UserRepository;
+import com.timesheetspro_api.common.repository.company.CompanyDetailsRepository;
 import com.timesheetspro_api.common.repository.company.CompanyEmployeeRepository;
 import com.timesheetspro_api.common.repository.company.CompanyShiftRepository;
 import com.timesheetspro_api.common.repository.company.LocationsRepository;
@@ -59,6 +61,9 @@ public class UserInOutServiceImpl implements UserInOutService {
     @Autowired
     private LocationsRepository locationsRepository;
 
+    @Autowired
+    private CompanyDetailsRepository companyDetailsRepository;
+
     @Override
     public Map<String, Object> dashboardCounts(int companyId) {
         try {
@@ -93,7 +98,7 @@ public class UserInOutServiceImpl implements UserInOutService {
     }
 
     @Override
-    public List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds) {
+    public List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds,Integer companyId) {
         try {
 
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
@@ -122,6 +127,10 @@ public class UserInOutServiceImpl implements UserInOutService {
             if (departmentIds != null && !departmentIds.isEmpty()) {
                 spec = spec.and(UserInOutSpecification.hasDepartmentIds(departmentIds));
             }
+            if (companyId != null) {
+                spec = spec.and(UserInOutSpecification.hasCompany(companyId));
+            }
+
             spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(end));
 
             List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec);
@@ -201,16 +210,18 @@ public class UserInOutServiceImpl implements UserInOutService {
         }
     }
 
-    public UserInOutDto createUserInOut(int userId, Integer locationId) {
+    public UserInOutDto createUserInOut(int userId, Integer locationId, Integer companyId) {
         try {
             UserInOut userInOut = new UserInOut();
             CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("Employee not found"));
             userInOut.setUser(companyEmployee);
+            CompanyDetails companyDetails = this.companyDetailsRepository.findById(companyId).orElseThrow(() -> new RuntimeException("Company not found"));
 
             Date currentDate = new Date();
             userInOut.setTimeIn(currentDate);
             userInOut.setCreatedOn(currentDate);
+            userInOut.setCompanyDetails(companyDetails);
             if (locationId != null) {
                 Locations locations = this.locationsRepository.findById(locationId).orElseThrow(() -> new RuntimeException("Location not found"));
                 if (locations != null) {
@@ -311,7 +322,7 @@ public class UserInOutServiceImpl implements UserInOutService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getTimeInOutReport(List<Integer> userIds, String startDate, String endDate, String timeZone) {
+    public Map<String, Object> getTimeInOutReport(List<Integer> userIds, String startDate, String endDate, String timeZone, Integer companyId) {
         try {
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
             dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -346,6 +357,9 @@ public class UserInOutServiceImpl implements UserInOutService {
             // Add a specification to filter by userIds
             if (userIds != null && !userIds.isEmpty()) {
                 spec = spec.and(UserInOutSpecification.userIdIn(userIds));
+            }
+            if (companyId != null) {
+                spec = spec.and(UserInOutSpecification.hasCompany(companyId));
             }
 
             List<UserInOut> userInOutRecords = userInOutRepository.findAll(spec);
@@ -482,14 +496,14 @@ public class UserInOutServiceImpl implements UserInOutService {
     }
 
     @Override
-    public String clickInOut(int userId, Integer locationId) {
+    public String clickInOut(int userId, Integer locationId, Integer companyId) {
         try {
             UserInOut isExisting = this.userInOutRepository.getCurrentUserRecord(userId);
             if (isExisting != null) {
                 this.updateUserInOut(isExisting.getId(), userId);
                 return "updated";
             } else {
-                this.createUserInOut(userId, locationId);
+                this.createUserInOut(userId, locationId, companyId);
                 return "created";
             }
         } catch (Exception e) {

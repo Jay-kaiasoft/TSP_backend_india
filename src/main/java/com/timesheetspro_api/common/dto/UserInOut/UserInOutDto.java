@@ -16,5 +16,6 @@ public class UserInOutDto {
     private String userName;
     private String createdOn;
     private int locationId;
+    private Integer companyId;
     private CompanyShiftDto companyShiftDto;
 }
