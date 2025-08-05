@@ -134,7 +134,6 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
                             BigDecimal totalPfAmount = pfAmountPerDay.multiply(BigDecimal.valueOf(daysWorked));
-
                             map.put("basic_salary", emp.getBasicSalary());
                             map.put("total_basic_salary", totalBasicSalary);
                             map.put("employee_pf_amount", totalPfAmount);

@@ -77,6 +77,7 @@ public class CompanyEmployeeDto {
     private String canteenType;
     private Integer canteenAmount;
     private Integer otId;
+    private Integer lunchBreak;
 
     private CompanyShiftDto companyShiftDto;
     private EmployeeBackAccountInfoDTO employeeBackAccountInfoDTO;

@@ -187,6 +187,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             if ("Percentage".equals(companyEmployee.getPfType())) {
                 Integer pfPercentage = Optional.ofNullable(companyEmployee.getPfPercentage()).orElse(0);
                 BigDecimal basicSalaryPerMonth = BigDecimal.valueOf(companyEmployee.getBasicSalary());
+
                 BigDecimal basicSalaryPerDay = basicSalaryPerMonth.divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
                 BigDecimal pfAmountPerDay = basicSalaryPerDay.multiply(BigDecimal.valueOf(pfPercentage)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
                 BigDecimal totalPfAmount = pfAmountPerDay.multiply(BigDecimal.valueOf(daysWorked)).setScale(0, RoundingMode.HALF_UP);
@@ -203,7 +204,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 dto.setPfAmount(pfAmt);
             }
         }
-        dto.setTotalPfAmount(pfAmount);
+        dto.setTotalPfAmount(pfAmount * 2); // Assuming PF is calculated for both employee and employer contributions
 
         // PT for timeIn/timeOut users only
         Integer ptAmount = 0;
