@@ -11,4 +11,7 @@ public class SalaryStatementRequestDto {
     private Integer month;
     private Integer year;
     private Integer companyId;
+    private String startDate;
+    private String endDate;
+    private String timeZone;
 }

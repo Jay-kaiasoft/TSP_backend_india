@@ -5,6 +5,7 @@ import lombok.Data;
 @Data
 public class EmployeeSalaryStatementDto {
     private Integer companyId;
+    private Long clockInOutId;
     private Integer employeeId;
     private String employeeName;
     private Long departmentId;

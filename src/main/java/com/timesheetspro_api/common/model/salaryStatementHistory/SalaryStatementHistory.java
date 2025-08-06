@@ -19,6 +19,9 @@ public class SalaryStatementHistory {
     @Column(name = "company_id")
     private Integer companyId;
 
+    @Column(name = "clock_in_out_id")
+    private Integer clockInOutId;
+
     @Column(name = "employee_id")
     private Integer employeeId;
 

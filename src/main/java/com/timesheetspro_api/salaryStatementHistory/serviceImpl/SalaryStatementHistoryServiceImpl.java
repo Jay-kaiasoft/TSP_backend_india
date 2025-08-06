@@ -1,7 +1,9 @@
 package com.timesheetspro_api.salaryStatementHistory.serviceImpl;
 
 import com.timesheetspro_api.common.dto.salaryStatementHistory.SalaryStatementHistoryDto;
+import com.timesheetspro_api.common.model.UserInOut.UserInOut;
 import com.timesheetspro_api.common.model.salaryStatementHistory.SalaryStatementHistory;
+import com.timesheetspro_api.common.repository.UserInOutRepository;
 import com.timesheetspro_api.common.repository.company.SalaryStatementHistoryRepository;
 import com.timesheetspro_api.common.specification.SalaryStatementHistorySpecification;
 import com.timesheetspro_api.salaryStatementHistory.service.SalaryStatementHistoryService;
@@ -20,6 +22,9 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
 
     @Autowired
     private SalaryStatementHistoryRepository salaryStatementHistoryRepository;
+
+    @Autowired
+    private UserInOutRepository userInOutRepository;
 
     @Override
     public List<Map<String, Object>> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, List<String> month) {
@@ -99,17 +104,15 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
 
         try {
             for (SalaryStatementHistoryDto dto : salaryStatement) {
-                boolean exists = this.salaryStatementHistoryRepository.isExites(
-                        dto.getCompanyId(), dto.getEmployeeId(), dto.getMonth());
+                SalaryStatementHistory entity = new SalaryStatementHistory();
+                entity.setClockInOutId(Integer.parseInt(dto.getClockInOutId().toString()));
+                BeanUtils.copyProperties(dto, entity);
+                this.salaryStatementHistoryRepository.save(entity);
+                addedStatements.add(dto);
 
-                if (!exists) {
-                    SalaryStatementHistory entity = new SalaryStatementHistory();
-                    BeanUtils.copyProperties(dto, entity);
-                    this.salaryStatementHistoryRepository.save(entity);
-                    addedStatements.add(dto);
-                } else {
-                    throw new RuntimeException("Salary statement already exists for month " + dto.getMonth());
-                }
+                UserInOut userInOut = this.userInOutRepository.findById(dto.getClockInOutId()).orElseThrow(() -> new RuntimeException("Clock in out not found"));
+                userInOut.setIsSalaryGenerate(1);
+                this.userInOutRepository.save(userInOut);
             }
             return response;
 

@@ -18,4 +18,5 @@ public class UserInOutDto {
     private int locationId;
     private Integer companyId;
     private CompanyShiftDto companyShiftDto;
+    private Integer isSalaryGenerate;
 }

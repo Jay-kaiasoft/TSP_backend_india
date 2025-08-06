@@ -175,6 +175,9 @@ public class CompanyEmployee implements UserDetails {
     @Column(name = "lunch_break", nullable = true)
     private Integer lunchBreak;
 
+    @Column(name = "working_hours_include_lunch", nullable = true)
+    private Integer workingHoursIncludeLunch;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ot_id ", referencedColumnName = "id")
     private OvertimeRules overtimeRules;

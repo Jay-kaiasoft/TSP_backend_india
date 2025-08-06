@@ -78,6 +78,7 @@ public class CompanyEmployeeDto {
     private Integer canteenAmount;
     private Integer otId;
     private Integer lunchBreak;
+    private Integer workingHoursIncludeLunch;
 
     private CompanyShiftDto companyShiftDto;
     private EmployeeBackAccountInfoDTO employeeBackAccountInfoDTO;

@@ -222,6 +222,7 @@ public class UserInOutServiceImpl implements UserInOutService {
             userInOut.setTimeIn(currentDate);
             userInOut.setCreatedOn(currentDate);
             userInOut.setCompanyDetails(companyDetails);
+            userInOut.setIsSalaryGenerate(0);
             if (locationId != null) {
                 Locations locations = this.locationsRepository.findById(locationId).orElseThrow(() -> new RuntimeException("Location not found"));
                 if (locations != null) {

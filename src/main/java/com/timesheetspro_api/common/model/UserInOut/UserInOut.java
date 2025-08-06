@@ -42,4 +42,8 @@ public class UserInOut {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id", referencedColumnName = "id")
     private CompanyDetails companyDetails;
+
+    @Column(name = "is_salary_generate")
+    private Integer isSalaryGenerate;
+
 }

@@ -5,6 +5,7 @@ import lombok.Data;
 @Data
 public class SalaryStatementHistoryDto {
     private Integer id;
+    private Long clockInOutId;
     private Integer companyId;
     private Integer employeeId;
     private String employeeName;
@@ -24,4 +25,7 @@ public class SalaryStatementHistoryDto {
     private String month;
     private Integer totalDays;
     private Integer totalWorkingDays;
+    private String startDate;
+    private String endDate;
+    private String timeZone;
 }

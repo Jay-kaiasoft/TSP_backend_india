@@ -36,4 +36,10 @@ public class UserInOutSpecification {
         return (root, query, criteriaBuilder) ->
                 criteriaBuilder.greaterThanOrEqualTo(root.get("companyDetails").get("id"), companyId);
     }
+
+
+    public static Specification<UserInOut> isSalaryGenerate() {
+        return (root, query, cb) ->
+                root.get("isSalaryGenerate").in(0);
+    }
 }

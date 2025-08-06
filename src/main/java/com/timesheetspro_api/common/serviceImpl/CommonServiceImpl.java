@@ -111,26 +111,44 @@ public class CommonServiceImpl implements CommonService {
         }
     }
 
+//    @Override
+//    public Date convertLocalToUtc(String localDateTime, String timeZone, boolean hasTime) {
+//        try {
+//            SimpleDateFormat inputFormat;
+//            if (hasTime) {
+//                inputFormat = new SimpleDateFormat("MM/dd/yyyy, HH:mm:ss");
+//            } else {
+//                inputFormat = new SimpleDateFormat("MM/dd/yyyy");
+//            }
+//            inputFormat.setTimeZone(TimeZone.getTimeZone(timeZone));
+//
+//            SimpleDateFormat utcFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+//            utcFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+//
+//            Date parsedDate = inputFormat.parse(localDateTime);
+//            return parsedDate; // parsedDate is now in UTC
+//        } catch (ParseException e) {
+//            throw new RuntimeException("Error converting local date time to UTC: " + e.getMessage());
+//        }
+//    }
+
     @Override
     public Date convertLocalToUtc(String localDateTime, String timeZone, boolean hasTime) {
         try {
             SimpleDateFormat inputFormat;
-            if (hasTime) {
+            if (hasTime && localDateTime.contains(":")) {
                 inputFormat = new SimpleDateFormat("MM/dd/yyyy, HH:mm:ss");
             } else {
                 inputFormat = new SimpleDateFormat("MM/dd/yyyy");
             }
             inputFormat.setTimeZone(TimeZone.getTimeZone(timeZone));
 
-            SimpleDateFormat utcFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-            utcFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-
-            Date parsedDate = inputFormat.parse(localDateTime);
-            return parsedDate; // parsedDate is now in UTC
+            return inputFormat.parse(localDateTime); // parsedDate is now in UTC time zone
         } catch (ParseException e) {
-            throw new RuntimeException("Error converting local date time to UTC: " + e.getMessage());
+            throw new RuntimeException("Error converting local date time to UTC: " + localDateTime + " | hasTime=" + hasTime + " | Error: " + e.getMessage());
         }
     }
+
 
     @Override
     public String convertDateToString(Date date) {
@@ -202,8 +220,8 @@ public class CommonServiceImpl implements CommonService {
 
         File tempImageDirectory = new File(FILE_DIRECTORY + loginUserId + "/tempImage/" + folderName);
         File destinationDirectory = new File(FILE_DIRECTORY + loginUserId + "/" + folderName);
-        System.out.println("================= tempImageDirectory ================"+tempImageDirectory);
-        System.out.println("================= destinationDirectory ================"+destinationDirectory);
+        System.out.println("================= tempImageDirectory ================" + tempImageDirectory);
+        System.out.println("================= destinationDirectory ================" + destinationDirectory);
 
         // Ensure the destination directory exists
         if (!destinationDirectory.exists()) {
