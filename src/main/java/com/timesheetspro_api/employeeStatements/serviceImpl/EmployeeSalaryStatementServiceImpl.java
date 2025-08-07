@@ -156,11 +156,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             }
         }
         long employeeWorkedMinutes = totalWorkedMillis / (1000 * 60);
-        System.out.println("============ employeeWorkedMinutes ========="+employeeWorkedMinutes);
         long totalWorkedMinutes = employeeWorkedMinutes - (workDays.size() * companyEmployee.getLunchBreak());
-        System.out.println("============ companyEmployee.getLunchBreak() ============"+companyEmployee.getLunchBreak());
-        System.out.println("========= workDays.size() * companyEmployee.getLunchBreak() ======= "+workDays.size() * companyEmployee.getLunchBreak());
-        System.out.println("============ totalWorkedMinutes ========="+totalWorkedMinutes);
 
         long shiftMinutes = employeeShiftHours * 60L;
         long otMinutes = Math.max(totalWorkedMinutes - shiftMinutes, 0);
@@ -212,8 +208,8 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 Integer pfPercentage = Optional.ofNullable(companyEmployee.getPfPercentage()).orElse(0);
                 BigDecimal basicSalaryPerMonth = BigDecimal.valueOf(companyEmployee.getBasicSalary());
 
-                BigDecimal basicSalaryPerDay = basicSalaryPerMonth.divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
-                BigDecimal pfAmountPerDay = basicSalaryPerDay.multiply(BigDecimal.valueOf(pfPercentage)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+//                BigDecimal basicSalaryPerDay = basicSalaryPerMonth.divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
+                BigDecimal pfAmountPerDay = basicSalaryPerMonth.multiply(BigDecimal.valueOf(pfPercentage)).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
                 BigDecimal totalPfAmount = pfAmountPerDay.multiply(BigDecimal.valueOf(daysWorked)).setScale(0, RoundingMode.HALF_UP);
                 pfAmount = totalPfAmount.intValue();
                 dto.setPfPercentage(pfPercentage);
@@ -221,13 +217,14 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             if ("Fixed Amount".equals(companyEmployee.getPfType())) {
                 Integer pfAmt = Optional.ofNullable(companyEmployee.getPfAmount()).orElse(0);
                 BigDecimal monthlyPfAmount = BigDecimal.valueOf(pfAmt);
-                BigDecimal perDayPf = monthlyPfAmount.divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
-                BigDecimal totalPfAmount = perDayPf.multiply(BigDecimal.valueOf(daysWorked)).setScale(0, RoundingMode.HALF_UP);
+//                BigDecimal perDayPf = monthlyPfAmount.divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
+                BigDecimal totalPfAmount = monthlyPfAmount.multiply(BigDecimal.valueOf(daysWorked)).setScale(0, RoundingMode.HALF_UP);
                 pfAmount = totalPfAmount.intValue();
                 dto.setPfAmount(pfAmt);
             }
         }
-        dto.setTotalPfAmount(pfAmount * 2);
+        dto.setTotalPfAmount(pfAmount  > 900 ? 900 : pfAmount); // PF amount capped at 1800
+        pfAmount = pfAmount > 900 ? 900 : pfAmount;
 
         Integer ptAmount = 0;
         if (Boolean.TRUE.equals(companyEmployee.getIsPt())) {

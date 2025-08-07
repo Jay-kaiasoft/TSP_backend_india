@@ -19,4 +19,5 @@ public class UserInOutDto {
     private Integer companyId;
     private CompanyShiftDto companyShiftDto;
     private Integer isSalaryGenerate;
+    private String timeZone;
 }

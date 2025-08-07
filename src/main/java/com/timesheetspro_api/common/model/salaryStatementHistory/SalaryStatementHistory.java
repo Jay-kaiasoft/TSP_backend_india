@@ -1,5 +1,6 @@
 package com.timesheetspro_api.common.model.salaryStatementHistory;
 
+import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,8 +17,9 @@ public class SalaryStatementHistory {
     @Column(name = "id", unique = true, nullable = false)
     private Integer id;
 
-    @Column(name = "company_id")
-    private Integer companyId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", referencedColumnName = "id")
+    private CompanyDetails companyDetails;
 
     @Column(name = "clock_in_out_id")
     private Integer clockInOutId;
@@ -75,4 +77,7 @@ public class SalaryStatementHistory {
 
     @Column(name = "working_days")
     private Integer totalWorkingDays;
+
+    @Column(name = "note",nullable = true)
+    private String note;
 }

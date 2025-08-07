@@ -229,4 +229,18 @@ public class UserInOutController {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to create userInOut", resBody);
         }
     }
+
+    @PostMapping("/addClockInOut")
+    public ApiResponse<?> createUserInOut(@RequestBody UserInOutDto userInOutDto) {
+        Map<String, Object> resBody = new HashMap<>();
+        try {
+            return new ApiResponse<>(
+                    HttpStatus.CREATED.value(),
+                    "UserInOut added successfully",
+                    this.userInOutService.addClockInOut(userInOutDto)
+            );
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to create userInOut", resBody);
+        }
+    }
 }

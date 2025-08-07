@@ -127,18 +127,18 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                             Integer totalBasicSalary = emp.getBasicSalary() * month;
 
                             BigDecimal basicSalaryPerMonth = BigDecimal.valueOf(emp.getBasicSalary());
-                            BigDecimal basicSalaryPerDay = basicSalaryPerMonth.divide(BigDecimal.valueOf(30), 2, RoundingMode.HALF_UP);
+//                            BigDecimal basicSalaryPerDay = basicSalaryPerMonth.divide(BigDecimal.valueOf(30), 2, RoundingMode.HALF_UP);
 
-                            BigDecimal pfAmountPerDay = basicSalaryPerDay
+                            BigDecimal pfAmountPerDay = basicSalaryPerMonth
                                     .multiply(BigDecimal.valueOf(pfPercentage))
                                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
                             BigDecimal totalPfAmount = pfAmountPerDay.multiply(BigDecimal.valueOf(daysWorked));
                             map.put("basic_salary", emp.getBasicSalary());
                             map.put("total_basic_salary", totalBasicSalary);
-                            map.put("employee_pf_amount", totalPfAmount);
-                            map.put("employer_pf_amount", totalPfAmount);
-                            map.put("total_amount", totalPfAmount.multiply(BigDecimal.valueOf(2)));
+                            map.put("employee_pf_amount", totalPfAmount.compareTo(BigDecimal.valueOf(900)) > 0 ? 900 : totalPfAmount);
+                            map.put("employer_pf_amount", totalPfAmount.compareTo(BigDecimal.valueOf(900)) > 0 ? 900 : totalPfAmount);
+                            map.put("total_amount", totalPfAmount.multiply(BigDecimal.valueOf(2)).compareTo(BigDecimal.valueOf(1800)) > 0 ? BigDecimal.valueOf(1800) : totalPfAmount.multiply(BigDecimal.valueOf(2)));
                             map.put("pf_percentage", pfPercentage);
                         } else {
                             Integer totalBasicSalary = emp.getBasicSalary() * month;

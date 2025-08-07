@@ -31,4 +31,6 @@ public interface UserInOutService {
 
     String clickInOut(int userId, Integer locationId,Integer companyId);
 
+    UserInOutDto addClockInOut(UserInOutDto userInOutDto);
+
 }

@@ -2,9 +2,13 @@ package com.timesheetspro_api.salaryStatementHistory.serviceImpl;
 
 import com.timesheetspro_api.common.dto.salaryStatementHistory.SalaryStatementHistoryDto;
 import com.timesheetspro_api.common.model.UserInOut.UserInOut;
+import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
 import com.timesheetspro_api.common.model.salaryStatementHistory.SalaryStatementHistory;
 import com.timesheetspro_api.common.repository.UserInOutRepository;
+import com.timesheetspro_api.common.repository.company.CompanyDetailsRepository;
 import com.timesheetspro_api.common.repository.company.SalaryStatementHistoryRepository;
+import com.timesheetspro_api.common.service.CommonService;
+import com.timesheetspro_api.common.specification.EmployeeStatementSpecification;
 import com.timesheetspro_api.common.specification.SalaryStatementHistorySpecification;
 import com.timesheetspro_api.salaryStatementHistory.service.SalaryStatementHistoryService;
 import org.springframework.beans.BeanUtils;
@@ -25,6 +29,12 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
 
     @Autowired
     private UserInOutRepository userInOutRepository;
+
+    @Autowired
+    private CommonService commonService;
+
+    @Autowired
+    private CompanyDetailsRepository companyDetailsRepository;
 
     @Override
     public List<Map<String, Object>> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, List<String> month) {
@@ -100,19 +110,28 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
     @Override
     public Map<String, Object> addSalaryStatement(List<SalaryStatementHistoryDto> salaryStatement) {
         Map<String, Object> response = new HashMap<>();
-        List<SalaryStatementHistoryDto> addedStatements = new ArrayList<>();
-
         try {
             for (SalaryStatementHistoryDto dto : salaryStatement) {
+                java.util.Date startDate, endDate;
+                startDate = this.commonService.convertLocalToUtc(dto.getStartDate(), dto.getTimeZone(), false);
+                endDate = this.commonService.convertLocalToUtc(dto.getEndDate(), dto.getTimeZone(), false);
+
+                Specification<UserInOut> userSpec = Specification.where(EmployeeStatementSpecification.hasUserIds(List.of(dto.getEmployeeId())));
+                userSpec = userSpec.and(EmployeeStatementSpecification.betweenCreatedOn(startDate, endDate));
+
+                List<UserInOut> userInOuts = this.userInOutRepository.findAll(userSpec);
+                for (UserInOut userInOut : userInOuts) {
+                    userInOut.setIsSalaryGenerate(1); // Set to 1 to indicate salary has been generated
+                    this.userInOutRepository.save(userInOut);
+                }
+
                 SalaryStatementHistory entity = new SalaryStatementHistory();
+                CompanyDetails companyDetails = this.companyDetailsRepository.findById(dto.getCompanyId()).orElseThrow(() -> new RuntimeException("Company not found"));
+                entity.setCompanyDetails(companyDetails);
                 entity.setClockInOutId(Integer.parseInt(dto.getClockInOutId().toString()));
                 BeanUtils.copyProperties(dto, entity);
                 this.salaryStatementHistoryRepository.save(entity);
-                addedStatements.add(dto);
 
-                UserInOut userInOut = this.userInOutRepository.findById(dto.getClockInOutId()).orElseThrow(() -> new RuntimeException("Clock in out not found"));
-                userInOut.setIsSalaryGenerate(1);
-                this.userInOutRepository.save(userInOut);
             }
             return response;
 
@@ -126,6 +145,9 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
     public SalaryStatementHistoryDto updateSalaryStatement(Integer id, SalaryStatementHistoryDto salaryStatement) {
         try {
             SalaryStatementHistory salaryStatementHistory = this.salaryStatementHistoryRepository.findById(id).orElseThrow(() -> new RuntimeException("Salary Statement History not found"));
+            CompanyDetails companyDetails = this.companyDetailsRepository.findById(salaryStatement.getCompanyId()).orElseThrow(() -> new RuntimeException("Company not found"));
+            salaryStatementHistory.setCompanyDetails(companyDetails);
+
             BeanUtils.copyProperties(salaryStatement, salaryStatementHistory);
             this.salaryStatementHistoryRepository.save(salaryStatementHistory);
             return salaryStatement;

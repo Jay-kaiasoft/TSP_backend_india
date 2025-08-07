@@ -15,7 +15,6 @@ import com.timesheetspro_api.common.repository.company.CompanyShiftRepository;
 import com.timesheetspro_api.common.repository.company.LocationsRepository;
 import com.timesheetspro_api.common.service.CommonService;
 import com.timesheetspro_api.common.specification.UserInOutSpecification;
-import com.timesheetspro_api.locations.service.LocationService;
 import com.timesheetspro_api.userInOut.service.UserInOutService;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.RegionUtil;
@@ -26,9 +25,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
-import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -98,7 +97,7 @@ public class UserInOutServiceImpl implements UserInOutService {
     }
 
     @Override
-    public List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds,Integer companyId) {
+    public List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds, Integer companyId) {
         try {
 
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
@@ -223,6 +222,7 @@ public class UserInOutServiceImpl implements UserInOutService {
             userInOut.setCreatedOn(currentDate);
             userInOut.setCompanyDetails(companyDetails);
             userInOut.setIsSalaryGenerate(0);
+
             if (locationId != null) {
                 Locations locations = this.locationsRepository.findById(locationId).orElseThrow(() -> new RuntimeException("Location not found"));
                 if (locations != null) {
@@ -513,6 +513,42 @@ public class UserInOutServiceImpl implements UserInOutService {
         }
     }
 
+    @Override
+    public UserInOutDto addClockInOut(UserInOutDto userInOutDto) {
+        try {
+            UserInOut userInOut = userInOutDto.getId() != null ? this.userInOutRepository.findById(userInOutDto.getId()).orElseThrow(() -> new RuntimeException("Clock in out not found")) : new UserInOut();
+
+            CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userInOutDto.getUserId())
+                    .orElseThrow(() -> new RuntimeException("Employee not found"));
+            CompanyDetails companyDetails = this.companyDetailsRepository.findById(userInOutDto.getCompanyId())
+                    .orElseThrow(() -> new RuntimeException("Company not found"));
+
+            userInOut.setIsSalaryGenerate(0);
+            userInOut.setUser(companyEmployee);
+            userInOut.setCompanyDetails(companyDetails);
+
+            if (userInOutDto.getId() == null) {
+                userInOut.setCreatedOn(new Date());
+            }
+            if (userInOutDto.getTimeIn() != null) {
+                userInOut.setTimeIn(this.convertISOToDate(userInOutDto.getTimeIn()));
+            } else {
+                Date currentDate = new Date();
+                userInOut.setTimeIn(currentDate);
+            }
+            if (userInOutDto.getTimeOut() != null) {
+                userInOut.setTimeOut(this.convertISOToDate(userInOutDto.getTimeOut()));
+            } else {
+                userInOut.setTimeOut(null);
+            }
+            this.userInOutRepository.save(userInOut);
+            return userInOutDto;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
     private Set<String> generateMonthKeys(Date startDate, Date endDate, SimpleDateFormat monthFormat) {
         Set<String> monthKeys = new TreeSet<>(new Comparator<String>() {
             @Override
@@ -746,4 +782,14 @@ public class UserInOutServiceImpl implements UserInOutService {
         long minutes = totalMinutes % 60;
         return String.format("%d hr %02d min", hours, minutes);
     }
+
+    public Date convertISOToDate(String isoDateString) {
+        try {
+            Instant instant = Instant.parse(isoDateString);
+            return Date.from(instant);
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid date format: " + isoDateString, e);
+        }
+    }
+
 }
