@@ -37,5 +37,5 @@ public class SalaryStatementMaster {
     private Integer totalPt;
 
     @Column(name = "note")
-    private Integer note;
+    private String note;
 }

@@ -269,6 +269,19 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         dto.setTotalDeductions(totalDeductions);
         dto.setNetSalary(netSalary);
 
+        if (employeeId == 94){
+            System.out.println("Debugging Employee Salary Statement for Employee ID: " + employeeId);
+            System.out.println("Start Date: " + dateFormat.format(startDate));
+            System.out.println("End Date: " + dateFormat.format(endDate));
+            System.out.println("Total Days: " + totalDays);
+            System.out.println("Total Worked Days: " + workDays.size());
+            System.out.println("Total Worked Minutes: " + totalWorkedMinutes);
+            System.out.println("Overtime Minutes: " + otFinalMinutes);
+            System.out.println("Overtime Amount: " + otAmountFinal);
+            System.out.println("Total Earnings: " + totalEarnings);
+            System.out.println("Total Deductions: " + totalDeductions);
+            System.out.println("Net Salary: " + netSalary);
+        }
         return dto;
     }
 

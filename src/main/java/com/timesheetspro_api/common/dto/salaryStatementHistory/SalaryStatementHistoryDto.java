@@ -22,10 +22,13 @@ public class SalaryStatementHistoryDto {
     private Integer otherDeductions;
     private Integer totalDeductions;
     private Integer netSalary;
+    private Integer year;
+    private Integer monthNumber;
     private String month;
     private Integer totalDays;
     private Integer totalWorkingDays;
     private String startDate;
     private String endDate;
     private String timeZone;
+    private String note;
 }
