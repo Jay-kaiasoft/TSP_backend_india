@@ -12,6 +12,8 @@ public class OvertimeRulesDto {
     private Float otAmount;
     private String otType;
     private Integer companyId;
+    private Integer createdBy;
+    private String createdByUserName;
     private Timestamp startTime;
     private Timestamp endTime;
 }

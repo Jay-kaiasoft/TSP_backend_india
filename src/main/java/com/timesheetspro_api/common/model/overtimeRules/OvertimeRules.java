@@ -1,5 +1,6 @@
 package com.timesheetspro_api.common.model.overtimeRules;
 
+import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -22,6 +23,10 @@ public class OvertimeRules {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id", referencedColumnName = "id")
     private CompanyDetails companyDetails;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", referencedColumnName = "id")
+    private CompanyEmployee companyEmployee;
 
     @Column(name = "rule_name")
     private String ruleName;

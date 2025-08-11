@@ -217,13 +217,11 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             if ("Fixed Amount".equals(companyEmployee.getPfType())) {
                 Integer pfAmt = Optional.ofNullable(companyEmployee.getPfAmount()).orElse(0);
                 BigDecimal monthlyPfAmount = BigDecimal.valueOf(pfAmt);
-//                BigDecimal perDayPf = monthlyPfAmount.divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
-                BigDecimal totalPfAmount = monthlyPfAmount.multiply(BigDecimal.valueOf(daysWorked)).setScale(0, RoundingMode.HALF_UP);
-                pfAmount = totalPfAmount.intValue();
+                pfAmount = monthlyPfAmount.intValue();
                 dto.setPfAmount(pfAmt);
             }
         }
-        dto.setTotalPfAmount(pfAmount  > 900 ? 900 : pfAmount); // PF amount capped at 1800
+        dto.setTotalPfAmount(pfAmount > 900 ? 900 : pfAmount); // PF amount capped at 1800
         pfAmount = pfAmount > 900 ? 900 : pfAmount;
 
         Integer ptAmount = 0;
@@ -269,7 +267,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         dto.setTotalDeductions(totalDeductions);
         dto.setNetSalary(netSalary);
 
-        if (employeeId == 94){
+        if (employeeId == 94) {
             System.out.println("Debugging Employee Salary Statement for Employee ID: " + employeeId);
             System.out.println("Start Date: " + dateFormat.format(startDate));
             System.out.println("End Date: " + dateFormat.format(endDate));
