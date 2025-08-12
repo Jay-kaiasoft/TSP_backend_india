@@ -79,6 +79,7 @@ public class CompanyEmployeeDto {
     private Integer otId;
     private Integer lunchBreak;
     private Integer workingHoursIncludeLunch;
+    private Integer weeklyOffId;
 
     private CompanyShiftDto companyShiftDto;
     private EmployeeBackAccountInfoDTO employeeBackAccountInfoDTO;

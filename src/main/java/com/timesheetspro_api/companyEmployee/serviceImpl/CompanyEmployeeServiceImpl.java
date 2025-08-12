@@ -13,6 +13,7 @@ import com.timesheetspro_api.common.model.department.Department;
 import com.timesheetspro_api.common.model.employeeBackAccountInfo.EmployeeBackAccountInfo;
 import com.timesheetspro_api.common.model.employeeType.EmployeeType;
 import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
+import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
 import com.timesheetspro_api.common.repository.DepartmentRepository;
 import com.timesheetspro_api.common.repository.OvertimeRulesRepository;
 import com.timesheetspro_api.common.repository.UserInOutRepository;
@@ -78,6 +79,9 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
     @Autowired
     private OvertimeRulesRepository overtimeRulesRepository;
 
+    @Autowired
+    private WeeklyOffRepository weeklyOffRepository;
+
     @Override
     public List<Map<String, Object>> getReports(int companyId, String type, int month) {
         try {
@@ -129,16 +133,16 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                             BigDecimal basicSalaryPerMonth = BigDecimal.valueOf(emp.getBasicSalary());
 //                            BigDecimal basicSalaryPerDay = basicSalaryPerMonth.divide(BigDecimal.valueOf(30), 2, RoundingMode.HALF_UP);
 
-                            BigDecimal pfAmountPerDay = basicSalaryPerMonth
+                            BigDecimal pfAmount = basicSalaryPerMonth
                                     .multiply(BigDecimal.valueOf(pfPercentage))
                                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
-                            BigDecimal totalPfAmount = pfAmountPerDay.multiply(BigDecimal.valueOf(daysWorked));
+//                            BigDecimal totalPfAmount = pfAmountPerDay.multiply(BigDecimal.valueOf(daysWorked));
                             map.put("basic_salary", emp.getBasicSalary());
                             map.put("total_basic_salary", totalBasicSalary);
-                            map.put("employee_pf_amount", totalPfAmount.compareTo(BigDecimal.valueOf(900)) > 0 ? 900 : totalPfAmount);
-                            map.put("employer_pf_amount", totalPfAmount.compareTo(BigDecimal.valueOf(900)) > 0 ? 900 : totalPfAmount);
-                            map.put("total_amount", totalPfAmount.multiply(BigDecimal.valueOf(2)).compareTo(BigDecimal.valueOf(1800)) > 0 ? BigDecimal.valueOf(1800) : totalPfAmount.multiply(BigDecimal.valueOf(2)));
+                            map.put("employee_pf_amount", pfAmount.compareTo(BigDecimal.valueOf(900)) > 0 ? 900 : pfAmount);
+                            map.put("employer_pf_amount", pfAmount.compareTo(BigDecimal.valueOf(900)) > 0 ? 900 : pfAmount);
+                            map.put("total_amount", pfAmount.multiply(BigDecimal.valueOf(2)).compareTo(BigDecimal.valueOf(1800)) > 0 ? BigDecimal.valueOf(1800) : pfAmount.multiply(BigDecimal.valueOf(2)));
                             map.put("pf_percentage", pfPercentage);
                         } else {
                             Integer totalBasicSalary = emp.getBasicSalary() * month;
@@ -255,6 +259,13 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 companyEmployeeDto.setHiredDate(this.commonService.convertDateToString(companyEmployee.getHiredDate()));
             }
 
+            if (companyEmployee.getOvertimeRules() != null) {
+                companyEmployeeDto.setOtId(companyEmployee.getOvertimeRules().getId());
+            }
+
+            if (companyEmployee.getWeeklyOff() != null) {
+                companyEmployeeDto.setWeeklyOffId(companyEmployee.getWeeklyOff().getId());
+            }
             BeanUtils.copyProperties(companyEmployee, companyEmployeeDto);
 
             CompanyEmployeeRoles role = this.companyEmployeeRoleRepository.findById(companyEmployee.getRoles().getRoleId()).orElseThrow(() -> new RuntimeException("Role not found"));
@@ -301,6 +312,12 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
             } else {
                 companyEmployee.setOvertimeRules(null);
             }
+            if (companyEmployeeDto.getWeeklyOffId() != null) {
+                WeeklyOff weeklyOff = this.weeklyOffRepository.findById(companyEmployeeDto.getWeeklyOffId()).orElseThrow(() -> new RuntimeException("Weekly off not found"));
+                companyEmployee.setWeeklyOff(weeklyOff);
+            } else {
+                companyEmployee.setWeeklyOff(null);
+            }
             companyEmployee.setCompanyDetails(companyDetails);
             companyEmployee.setRoles(companyEmployeeRoles);
             companyEmployee.setDepartment(department);
@@ -346,6 +363,12 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 companyEmployee.setOvertimeRules(null);
             }
 
+            if (companyEmployeeDto.getWeeklyOffId() != null) {
+                WeeklyOff weeklyOff = this.weeklyOffRepository.findById(companyEmployeeDto.getWeeklyOffId()).orElseThrow(() -> new RuntimeException("Weekly off not found"));
+                companyEmployee.setWeeklyOff(weeklyOff);
+            } else {
+                companyEmployee.setWeeklyOff(null);
+            }
             companyEmployee.setCompanyShift(companyShift);
             companyEmployee.setCompanyDetails(companyDetails);
             companyEmployee.setRoles(companyEmployeeRoles);

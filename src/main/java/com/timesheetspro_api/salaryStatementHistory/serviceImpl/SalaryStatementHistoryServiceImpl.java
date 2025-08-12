@@ -134,25 +134,25 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
 
                 SalaryStatementHistory entity = this.salaryStatementHistoryRepository.isExites(dto.getEmployeeId(),dto.getCompanyId(), dto.getMonth());
                 if (entity != null) {
-                    Integer totalOtAmount = entity.getOtAmount() != null ? dto.getOtAmount() + dto.getOtAmount() : 0;
+                    Integer totalOtAmount = entity.getOtAmount() != null ? dto.getOtAmount() : 0;
                     entity.setOtAmount(totalOtAmount);
-                    Integer totalEarningsAmount = entity.getTotalEarnSalary() != null ? dto.getTotalEarnSalary() + dto.getTotalEarnSalary() : 0;
+                    Integer totalEarningsAmount = entity.getTotalEarnSalary() != null ? dto.getTotalEarnSalary()  : 0;
                     entity.setTotalEarnSalary(totalEarningsAmount);
-                    Integer totalPfAmount = entity.getTotalPfAmount() != null ? dto.getTotalPfAmount() + dto.getTotalPfAmount() : 0;
+                    Integer totalPfAmount = entity.getTotalPfAmount() != null ? dto.getTotalPfAmount() : 0;
                     entity.setTotalPfAmount(totalPfAmount);
-                    Integer totalPtAmount = entity.getPtAmount() != null ? dto.getPtAmount() + dto.getPtAmount() : 0;
+                    Integer totalPtAmount = entity.getPtAmount() != null ? dto.getPtAmount() : 0;
                     entity.setPtAmount(totalPtAmount);
-                    Integer totalNetSalary = entity.getNetSalary() != null ? dto.getNetSalary() + dto.getNetSalary() : 0;
+                    Integer totalNetSalary = entity.getNetSalary() != null ? dto.getNetSalary(): 0;
                     entity.setNetSalary(totalNetSalary);
-                    Integer otherDeduction = entity.getOtherDeductions() != null ? dto.getOtherDeductions() + dto.getOtherDeductions() : 0;
+                    Integer otherDeduction = entity.getOtherDeductions() != null ? dto.getOtherDeductions()  : 0;
                     entity.setOtherDeductions(otherDeduction);
-                    Integer totalDeduction = entity.getTotalDeductions() != null ? dto.getTotalDeductions() + dto.getOtherDeductions() : 0;
+                    Integer totalDeduction = entity.getTotalDeductions() != null ? dto.getTotalDeductions() : 0;
                     entity.setTotalDeductions(totalDeduction);
-                    Integer totalEarnings = entity.getTotalEarnings() != null ? dto.getTotalEarnings() + dto.getTotalEarnings() : 0;
+                    Integer totalEarnings = entity.getTotalEarnings() != null ? dto.getTotalEarnings()  : 0;
                     entity.setTotalEarnings(totalEarnings);
                     entity.setNote(dto.getNote());
                     this.salaryStatementHistoryRepository.save(entity);
-                }else{
+                } else{
                     entity = new SalaryStatementHistory();
                     CompanyDetails companyDetails = this.companyDetailsRepository.findById(dto.getCompanyId()).orElseThrow(() -> new RuntimeException("Company not found"));
                     entity.setCompanyDetails(companyDetails);

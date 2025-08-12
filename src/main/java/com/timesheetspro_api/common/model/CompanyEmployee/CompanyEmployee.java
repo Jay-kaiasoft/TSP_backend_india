@@ -7,6 +7,7 @@ import com.timesheetspro_api.common.model.companyShift.CompanyShift;
 import com.timesheetspro_api.common.model.department.Department;
 import com.timesheetspro_api.common.model.employeeType.EmployeeType;
 import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
+import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -181,6 +182,10 @@ public class CompanyEmployee implements UserDetails {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ot_id ", referencedColumnName = "id")
     private OvertimeRules overtimeRules;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "weekly_off", referencedColumnName = "id")
+    private WeeklyOff weeklyOff;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

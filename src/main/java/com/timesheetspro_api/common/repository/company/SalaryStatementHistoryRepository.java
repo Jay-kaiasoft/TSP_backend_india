@@ -20,7 +20,7 @@ public interface SalaryStatementHistoryRepository extends JpaRepository<SalarySt
     @Query("SELECT s FROM SalaryStatementHistory s WHERE s.month=:month AND s.companyDetails.id=:companyId")
     SalaryStatementHistory findByMonth(int companyId, String month);
 
-    @Query("SELECT COUNT(s) > 0 FROM SalaryStatementHistory s WHERE s.employeeId = :employeeId AND s.month = :month AND s.companyDetails.id = :companyId")
+    @Query("SELECT s FROM SalaryStatementHistory s WHERE s.employeeId = :employeeId AND s.month = :month AND s.companyDetails.id = :companyId")
     SalaryStatementHistory isExites(@Param("companyId") int companyId,
                      @Param("employeeId") int employeeId,
                      @Param("month") String month);
