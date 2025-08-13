@@ -18,6 +18,6 @@ public class SalaryStatementHistorySpecification {
 
     public static Specification<SalaryStatementHistory> hasMonth(List<String> month) {
         return (root, query, cb) ->
-                root.get("month").in(month);
+                root.get("monthYear").in(month);
     }
 }

@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -32,6 +33,24 @@ public class WeeklyOffController {
         Map<String, Object> resBody = new HashMap<>();
         try {
             return new ApiResponse<>(HttpStatus.OK.value(), "Template fetched successfully", this.weeklyOffService.getById(id));
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
+        }
+    }
+
+    @PostMapping("/assignEmployees")
+    public ApiResponse<?> assignEmployees(@RequestBody Map<String, Object> data) {
+        Map<String, Object> resBody = new HashMap<>();
+        try {
+            Integer weekOffId = (Integer) data.get("weekOffId");
+            List<Integer> employeeIds = (List<Integer>) data.get("employeeIds");
+
+            return new ApiResponse<>(
+                    HttpStatus.OK.value(),
+                    "Template assigned successfully",
+                    this.weeklyOffService.assignEmployees(employeeIds, weekOffId)
+            );
+
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
         }

@@ -126,7 +126,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         int totalPaidDays = 0;
         if (workingDayConfig != null) {
             Set<LocalDate> allPaidDays = calculatePaidDays(startDate, endDate, workingDayConfig);
-            System.out.println("All Paid Days: " + allPaidDays);
             totalPaidDays = totalPaidDays + allPaidDays.size();
         }
 

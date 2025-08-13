@@ -24,11 +24,12 @@ public class SalaryStatementHistoryDto {
     private Integer netSalary;
     private Integer year;
     private Integer monthNumber;
-    private String month;
+    private String monthYear;
     private Integer totalDays;
     private Integer totalWorkingDays;
     private String startDate;
     private String endDate;
     private String timeZone;
     private String note;
+    private Integer generatedBy;
 }

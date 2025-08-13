@@ -2,12 +2,14 @@ package com.timesheetspro_api.salaryStatementHistory.serviceImpl;
 
 import com.timesheetspro_api.common.dto.SalaryStatementMaster.SalaryStatementMasterDto;
 import com.timesheetspro_api.common.dto.salaryStatementHistory.SalaryStatementHistoryDto;
+import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.UserInOut.UserInOut;
 import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
 import com.timesheetspro_api.common.model.salaryStatementHistory.SalaryStatementHistory;
 import com.timesheetspro_api.common.model.salaryStatementMaster.SalaryStatementMaster;
 import com.timesheetspro_api.common.repository.UserInOutRepository;
 import com.timesheetspro_api.common.repository.company.CompanyDetailsRepository;
+import com.timesheetspro_api.common.repository.company.CompanyEmployeeRepository;
 import com.timesheetspro_api.common.repository.company.SalaryStatementHistoryRepository;
 import com.timesheetspro_api.common.service.CommonService;
 import com.timesheetspro_api.common.specification.EmployeeStatementSpecification;
@@ -41,6 +43,9 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
 
     @Autowired
     private SalaryStatementMasterService salaryStatementMasterService;
+
+    @Autowired
+    private CompanyEmployeeRepository companyEmployeeRepository;
 
     @Override
     public List<Map<String, Object>> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, List<String> month) {
@@ -78,7 +83,7 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
 
             // Group by month
             Map<String, List<SalaryStatementHistoryDto>> grouped = dtoList.stream()
-                    .collect(Collectors.groupingBy(SalaryStatementHistoryDto::getMonth));
+                    .collect(Collectors.groupingBy(SalaryStatementHistoryDto::getMonthYear));
 
             // Build result without using DTO
             List<Map<String, Object>> result = new ArrayList<>();
@@ -117,7 +122,6 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
     public Map<String, Object> addSalaryStatement(List<SalaryStatementHistoryDto> salaryStatement) {
         Map<String, Object> response = new HashMap<>();
         try {
-
             for (SalaryStatementHistoryDto dto : salaryStatement) {
                 java.util.Date startDate, endDate;
                 startDate = this.commonService.convertLocalToUtc(dto.getStartDate(), dto.getTimeZone(), false);
@@ -132,32 +136,32 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
                     this.userInOutRepository.save(userInOut);
                 }
 
-                SalaryStatementHistory entity = this.salaryStatementHistoryRepository.isExites(dto.getEmployeeId(),dto.getCompanyId(), dto.getMonth());
+                SalaryStatementHistory entity = this.salaryStatementHistoryRepository.isExites(dto.getEmployeeId(), dto.getCompanyId(), dto.getMonthNumber(), dto.getYear());
                 if (entity != null) {
-                    Integer totalOtAmount = entity.getOtAmount() != null ? dto.getOtAmount() : 0;
-                    entity.setOtAmount(totalOtAmount);
-                    Integer totalEarningsAmount = entity.getTotalEarnSalary() != null ? dto.getTotalEarnSalary()  : 0;
-                    entity.setTotalEarnSalary(totalEarningsAmount);
-                    Integer totalPfAmount = entity.getTotalPfAmount() != null ? dto.getTotalPfAmount() : 0;
-                    entity.setTotalPfAmount(totalPfAmount);
-                    Integer totalPtAmount = entity.getPtAmount() != null ? dto.getPtAmount() : 0;
-                    entity.setPtAmount(totalPtAmount);
-                    Integer totalNetSalary = entity.getNetSalary() != null ? dto.getNetSalary(): 0;
-                    entity.setNetSalary(totalNetSalary);
-                    Integer otherDeduction = entity.getOtherDeductions() != null ? dto.getOtherDeductions()  : 0;
-                    entity.setOtherDeductions(otherDeduction);
-                    Integer totalDeduction = entity.getTotalDeductions() != null ? dto.getTotalDeductions() : 0;
-                    entity.setTotalDeductions(totalDeduction);
-                    Integer totalEarnings = entity.getTotalEarnings() != null ? dto.getTotalEarnings()  : 0;
-                    entity.setTotalEarnings(totalEarnings);
+                    System.out.println("================ existing entity found ================");
+                    entity.setOtAmount(dto.getOtAmount() + entity.getOtAmount());
+                    entity.setTotalEarnSalary(dto.getTotalEarnings() + entity.getTotalEarnSalary());
+                    entity.setTotalPfAmount(dto.getTotalPfAmount() + entity.getTotalPfAmount());
+                    entity.setPtAmount(dto.getPtAmount() + entity.getPtAmount());
+                    entity.setNetSalary(dto.getNetSalary() + entity.getNetSalary());
+                    entity.setOtherDeductions(dto.getOtherDeductions() + entity.getOtherDeductions());
+                    entity.setTotalDeductions(dto.getTotalDeductions() + entity.getTotalDeductions());
+                    entity.setTotalEarnings(dto.getTotalEarnings() + entity.getTotalEarnings());
                     entity.setNote(dto.getNote());
                     this.salaryStatementHistoryRepository.save(entity);
-                } else{
+                } else {
                     entity = new SalaryStatementHistory();
                     CompanyDetails companyDetails = this.companyDetailsRepository.findById(dto.getCompanyId()).orElseThrow(() -> new RuntimeException("Company not found"));
                     entity.setCompanyDetails(companyDetails);
+                    CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(dto.getGeneratedBy())
+                            .orElseThrow(() -> new RuntimeException("Company Employee not found"));
+                    entity.setCompanyEmployee(companyEmployee);
                     entity.setClockInOutId(Integer.parseInt(dto.getClockInOutId().toString()));
-                    BeanUtils.copyProperties(dto, entity);
+                    entity.setMonth(dto.getMonthNumber());
+                    entity.setYear(dto.getYear());
+                    Date currentDate = new Date();
+                    entity.setGeneratedDate(currentDate);
+                    BeanUtils.copyProperties(dto, entity, "id", "companyId", "month");
                     this.salaryStatementHistoryRepository.save(entity);
                 }
 
@@ -165,14 +169,16 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
                         .getSalaryStatementMastersByMonthAndYear(dto.getCompanyId(), dto.getMonthNumber(), dto.getYear());
 
                 if (salaryStatementMasterDto != null) {
-                    Integer currentTotalSalary = salaryStatementMasterDto.getTotalSalary() != null ? salaryStatementMasterDto.getTotalSalary() : 0;
-                    Integer netSalary = dto.getNetSalary() != null ? dto.getNetSalary() : 0;
-                    salaryStatementMasterDto.setTotalSalary(currentTotalSalary + netSalary);
+                    Integer totalSalary = salaryStatementMasterDto.getTotalSalary() != null ? dto.getNetSalary() + salaryStatementMasterDto.getTotalSalary() : 0;
+                    System.out.println("========== Total Salary: " + totalSalary);
+                    salaryStatementMasterDto.setTotalSalary(totalSalary);
 
-                    Integer pfAmount = dto.getTotalPfAmount() != null ? dto.getTotalPfAmount() : 0;
+                    Integer pfAmount = dto.getTotalPfAmount() != null ? dto.getTotalPfAmount() + salaryStatementMasterDto.getTotalPf() : 0;
+                    System.out.println("========== Total pfAmount: " + pfAmount);
                     salaryStatementMasterDto.setTotalPf(pfAmount);
 
-                    Integer ptAmount = dto.getPtAmount() != null ? dto.getPtAmount() : 0;
+                    Integer ptAmount = dto.getPtAmount() != null ? dto.getPtAmount() + salaryStatementMasterDto.getTotalPt() : 0;
+                    System.out.println("========== Total ptAmount: " + ptAmount);
                     salaryStatementMasterDto.setTotalPt(ptAmount);
 
                     salaryStatementMasterDto.setNote(salaryStatementMasterDto.getNote());
@@ -206,6 +212,22 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
             SalaryStatementHistory salaryStatementHistory = this.salaryStatementHistoryRepository.findById(id).orElseThrow(() -> new RuntimeException("Salary Statement History not found"));
             BeanUtils.copyProperties(salaryStatement, salaryStatementHistory);
             this.salaryStatementHistoryRepository.save(salaryStatementHistory);
+
+            Object[] result = this.salaryStatementHistoryRepository
+                    .getSalaryTotals(salaryStatement.getCompanyId(), salaryStatement.getMonthNumber(), salaryStatement.getYear())
+                    .get(0);
+
+            Integer totalNetSalary = ((Number) result[0]).intValue();
+            Integer totalPfAmount = ((Number) result[1]).intValue();
+            Integer totalPtAmount = ((Number) result[2]).intValue();
+
+            SalaryStatementMasterDto salaryStatementMasterDto = this.salaryStatementMasterService.getSalaryStatementMastersByMonthAndYear(salaryStatement.getCompanyId(), salaryStatement.getMonthNumber(), salaryStatement.getYear());
+            if (salaryStatementMasterDto != null) {
+                salaryStatementMasterDto.setTotalSalary(totalNetSalary);
+                salaryStatementMasterDto.setTotalPf(totalPfAmount);
+                salaryStatementMasterDto.setTotalPt(totalPtAmount);
+                this.salaryStatementMasterService.updateSalaryStatementMaster(salaryStatementMasterDto.getId(), salaryStatementMasterDto);
+            }
             return salaryStatement;
         } catch (Exception e) {
             e.printStackTrace();

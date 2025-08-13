@@ -21,7 +21,11 @@ public class WeeklyOff {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "description")
     private String description;
+
+    @Column(name = "is_default", columnDefinition = "INT DEFAULT 0")
+    private Integer isDefault = 0;
 
     @Column(name = "sunday_all")
     private boolean sundayAll;
@@ -154,7 +158,6 @@ public class WeeklyOff {
 
     @Column(name = "saturday_5th")
     private boolean saturday5th;
-
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", referencedColumnName = "id")

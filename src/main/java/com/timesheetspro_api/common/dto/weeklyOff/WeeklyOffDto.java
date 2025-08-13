@@ -11,6 +11,7 @@ public class WeeklyOffDto {
     private String name;
 
     private String description;
+    private Integer isDefault;
 
     // For brevity, include only sundayAll / mondayAll etc. but include others similarly
     private boolean sundayAll;

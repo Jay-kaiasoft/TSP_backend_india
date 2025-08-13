@@ -1,10 +1,13 @@
 package com.timesheetspro_api.common.model.salaryStatementHistory;
 
+import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.util.Date;
 
 @Entity
 @Table(name = "salary_statement_history")
@@ -69,8 +72,14 @@ public class SalaryStatementHistory {
     @Column(name = "net_salary")
     private Integer netSalary;
 
-    @Column(name = "month", nullable = true)
-    private String month;
+    @Column(name = "salary_month_and_year", nullable = true)
+    private String monthYear;
+
+    @Column(name = "salary_month", nullable = true)
+    private Integer month;
+
+    @Column(name = "salary_year", nullable = true)
+    private Integer year;
 
     @Column(name = "total_days")
     private Integer totalDays;
@@ -80,4 +89,12 @@ public class SalaryStatementHistory {
 
     @Column(name = "note",nullable = true)
     private String note;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "generated_by", referencedColumnName = "id")
+    private CompanyEmployee companyEmployee;
+
+    @Column(name = "generated_date")
+    @Temporal(TemporalType.DATE)
+    private Date generatedDate;
 }

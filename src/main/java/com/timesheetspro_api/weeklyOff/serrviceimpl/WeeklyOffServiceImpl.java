@@ -1,6 +1,7 @@
 package com.timesheetspro_api.weeklyOff.serrviceimpl;
 
 import com.timesheetspro_api.common.dto.weeklyOff.WeeklyOffDto;
+import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
 import com.timesheetspro_api.common.repository.company.CompanyDetailsRepository;
 import com.timesheetspro_api.common.repository.company.CompanyEmployeeRepository;
@@ -24,6 +25,28 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
 
     @Autowired
     private CompanyEmployeeRepository companyEmployeeRepository;
+
+    @Override
+    public boolean assignEmployees(List<Integer> employeeIds, Integer weeklyOffId) {
+        try {
+            if (!employeeIds.isEmpty()){
+                WeeklyOff weeklyOff = this.repository.findById(weeklyOffId)
+                        .orElseThrow(() -> new IllegalArgumentException("Weekly off not found"));
+                for (Integer employeeId : employeeIds) {
+                    CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(employeeId)
+                            .orElseThrow(() -> new IllegalArgumentException("Employee not found with ID: " + employeeId));
+                    companyEmployee.setWeeklyOff(weeklyOff);
+                    this.companyEmployeeRepository.save(companyEmployee);
+                }
+                return true;
+            } else {
+                throw new IllegalArgumentException("Employee ID cannot be null or empty");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
 
     @Override
     public List<WeeklyOffDto> getAllByCompany(Integer companyId) {
