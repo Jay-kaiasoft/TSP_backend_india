@@ -22,6 +22,7 @@ public class EmployeeSalaryStatementDto {
     private Integer otherDeductions;
     private Integer totalDeductions;
     private Integer netSalary;
-    private Integer totalDays;
+    private Integer totalPaidDays;
     private Integer totalWorkingDays;
+    private Integer totalDays;
 }

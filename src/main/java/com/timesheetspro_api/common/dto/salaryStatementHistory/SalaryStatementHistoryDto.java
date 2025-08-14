@@ -25,8 +25,9 @@ public class SalaryStatementHistoryDto {
     private Integer year;
     private Integer monthNumber;
     private String monthYear;
-    private Integer totalDays;
+    private Integer totalPaidDays;
     private Integer totalWorkingDays;
+    private Integer totalDays;
     private String startDate;
     private String endDate;
     private String timeZone;

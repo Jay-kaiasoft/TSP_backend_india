@@ -6,7 +6,6 @@ import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.UserInOut.UserInOut;
 import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
 import com.timesheetspro_api.common.model.salaryStatementHistory.SalaryStatementHistory;
-import com.timesheetspro_api.common.model.salaryStatementMaster.SalaryStatementMaster;
 import com.timesheetspro_api.common.repository.UserInOutRepository;
 import com.timesheetspro_api.common.repository.company.CompanyDetailsRepository;
 import com.timesheetspro_api.common.repository.company.CompanyEmployeeRepository;
@@ -139,6 +138,7 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
                 SalaryStatementHistory entity = this.salaryStatementHistoryRepository.isExites(dto.getEmployeeId(), dto.getCompanyId(), dto.getMonthNumber(), dto.getYear());
                 if (entity != null) {
                     System.out.println("================ existing entity found ================");
+
                     entity.setOtAmount(dto.getOtAmount() + entity.getOtAmount());
                     entity.setTotalEarnSalary(dto.getTotalEarnings() + entity.getTotalEarnSalary());
                     entity.setTotalPfAmount(dto.getTotalPfAmount() + entity.getTotalPfAmount());

@@ -174,6 +174,11 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
         // Calculate PF
         int pfAmount = calculatePfAmount(companyEmployee);
+        if (companyEmployee.getPfPercentage() != null && companyEmployee.getPfPercentage() > 0) {
+            dto.setPfPercentage(companyEmployee.getPfPercentage());
+        } else {
+            dto.setPfAmount(companyEmployee.getPfAmount());
+        }
         dto.setTotalPfAmount(pfAmount > 900 ? 900 : pfAmount);
         pfAmount = pfAmount > 900 ? 900 : pfAmount;
 
@@ -190,7 +195,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         int baseSalary = (int) (dailySalary * (totalPaidDays + actualWorkDays.size()));
         int totalEarnings = baseSalary + otAmountFinal;
 
-//        if (companyEmployee.getEmployeeId() == 96) {
+//        if (companyEmployee.getEmployeeId() == 94) {
 //            System.out.println("Debugging Employee Salary Statement for Employee ID: " + companyEmployee.getEmployeeId());
 //            System.out.println("Start Date: " + dateFormat.format(startDate));
 //            System.out.println("End Date: " + dateFormat.format(endDate));
@@ -208,8 +213,9 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         // Set all calculated values
         dto.setOverTime(otFinalMinutes);
         dto.setOtAmount(otAmountFinal);
-        dto.setTotalDays(totalPaidDays);
-        dto.setTotalWorkingDays((actualWorkDays.size() + totalPaidDays));
+        dto.setTotalPaidDays(totalPaidDays);
+        dto.setTotalWorkingDays(actualWorkDays.size());
+        dto.setTotalDays((actualWorkDays.size() + totalPaidDays));
         dto.setTotalEarnSalary(baseSalary);
         dto.setOtherDeductions(otherDeductions);
         dto.setTotalEarnings(totalEarnings);

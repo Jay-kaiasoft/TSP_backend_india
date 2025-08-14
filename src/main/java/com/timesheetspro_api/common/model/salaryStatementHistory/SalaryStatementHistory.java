@@ -81,11 +81,14 @@ public class SalaryStatementHistory {
     @Column(name = "salary_year", nullable = true)
     private Integer year;
 
-    @Column(name = "total_days")
-    private Integer totalDays;
+    @Column(name = "total_paid_days")
+    private Integer totalPaidDays;
 
     @Column(name = "working_days")
     private Integer totalWorkingDays;
+
+    @Column(name = "total_days")
+    private Integer totalDays;
 
     @Column(name = "note",nullable = true)
     private String note;
