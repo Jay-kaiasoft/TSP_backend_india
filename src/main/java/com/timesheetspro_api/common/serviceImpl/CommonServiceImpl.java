@@ -12,21 +12,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -34,16 +30,9 @@ import java.util.TimeZone;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.stereotype.Service;
 
 @Service(value = "commonService")
 public class CommonServiceImpl implements CommonService {
@@ -111,27 +100,6 @@ public class CommonServiceImpl implements CommonService {
         }
     }
 
-//    @Override
-//    public Date convertLocalToUtc(String localDateTime, String timeZone, boolean hasTime) {
-//        try {
-//            SimpleDateFormat inputFormat;
-//            if (hasTime) {
-//                inputFormat = new SimpleDateFormat("MM/dd/yyyy, HH:mm:ss");
-//            } else {
-//                inputFormat = new SimpleDateFormat("MM/dd/yyyy");
-//            }
-//            inputFormat.setTimeZone(TimeZone.getTimeZone(timeZone));
-//
-//            SimpleDateFormat utcFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-//            utcFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-//
-//            Date parsedDate = inputFormat.parse(localDateTime);
-//            return parsedDate; // parsedDate is now in UTC
-//        } catch (ParseException e) {
-//            throw new RuntimeException("Error converting local date time to UTC: " + e.getMessage());
-//        }
-//    }
-
     @Override
     public Date convertLocalToUtc(String localDateTime, String timeZone, boolean hasTime) {
         try {
@@ -148,7 +116,6 @@ public class CommonServiceImpl implements CommonService {
             throw new RuntimeException("Error converting local date time to UTC: " + localDateTime + " | hasTime=" + hasTime + " | Error: " + e.getMessage());
         }
     }
-
 
     @Override
     public String convertDateToString(Date date) {

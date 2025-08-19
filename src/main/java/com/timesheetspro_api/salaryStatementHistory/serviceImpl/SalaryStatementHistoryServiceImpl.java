@@ -137,8 +137,6 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
 
                 SalaryStatementHistory entity = this.salaryStatementHistoryRepository.isExites(dto.getEmployeeId(), dto.getCompanyId(), dto.getMonthNumber(), dto.getYear());
                 if (entity != null) {
-                    System.out.println("================ existing entity found ================");
-
                     entity.setOtAmount(dto.getOtAmount() + entity.getOtAmount());
                     entity.setTotalEarnSalary(dto.getTotalEarnings() + entity.getTotalEarnSalary());
                     entity.setTotalPfAmount(dto.getTotalPfAmount() + entity.getTotalPfAmount());
@@ -147,7 +145,9 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
                     entity.setOtherDeductions(dto.getOtherDeductions() + entity.getOtherDeductions());
                     entity.setTotalDeductions(dto.getTotalDeductions() + entity.getTotalDeductions());
                     entity.setTotalEarnings(dto.getTotalEarnings() + entity.getTotalEarnings());
+                    entity.setTotalPenaltyAmount(dto.getTotalPenaltyAmount() + entity.getTotalPenaltyAmount());
                     entity.setNote(dto.getNote());
+
                     this.salaryStatementHistoryRepository.save(entity);
                 } else {
                     entity = new SalaryStatementHistory();
@@ -170,15 +170,12 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
 
                 if (salaryStatementMasterDto != null) {
                     Integer totalSalary = salaryStatementMasterDto.getTotalSalary() != null ? dto.getNetSalary() + salaryStatementMasterDto.getTotalSalary() : 0;
-                    System.out.println("========== Total Salary: " + totalSalary);
                     salaryStatementMasterDto.setTotalSalary(totalSalary);
 
                     Integer pfAmount = dto.getTotalPfAmount() != null ? dto.getTotalPfAmount() + salaryStatementMasterDto.getTotalPf() : 0;
-                    System.out.println("========== Total pfAmount: " + pfAmount);
                     salaryStatementMasterDto.setTotalPf(pfAmount);
 
                     Integer ptAmount = dto.getPtAmount() != null ? dto.getPtAmount() + salaryStatementMasterDto.getTotalPt() : 0;
-                    System.out.println("========== Total ptAmount: " + ptAmount);
                     salaryStatementMasterDto.setTotalPt(ptAmount);
 
                     salaryStatementMasterDto.setNote(salaryStatementMasterDto.getNote());

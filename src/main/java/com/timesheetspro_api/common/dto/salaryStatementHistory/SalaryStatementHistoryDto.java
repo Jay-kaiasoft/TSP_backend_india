@@ -19,6 +19,7 @@ public class SalaryStatementHistoryDto {
     private Integer pfPercentage;
     private Integer ptAmount;
     private Integer totalEarnings;
+    private Integer totalPenaltyAmount;
     private Integer otherDeductions;
     private Integer totalDeductions;
     private Integer netSalary;

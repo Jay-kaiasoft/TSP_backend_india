@@ -66,6 +66,9 @@ public class SalaryStatementHistory {
     @Column(name = "total_deductions")
     private Integer totalDeductions;
 
+    @Column(name = "total_penalty_amount")
+    private Integer totalPenaltyAmount;
+
     @Column(name = "other_deductions")
     private Integer otherDeductions;
 

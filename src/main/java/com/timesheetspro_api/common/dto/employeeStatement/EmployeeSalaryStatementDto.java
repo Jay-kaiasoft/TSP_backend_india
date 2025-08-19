@@ -20,6 +20,7 @@ public class EmployeeSalaryStatementDto {
     private Integer ptAmount;
     private Integer totalEarnings;
     private Integer otherDeductions;
+    private Integer totalPenaltyAmount;
     private Integer totalDeductions;
     private Integer netSalary;
     private Integer totalPaidDays;

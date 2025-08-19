@@ -2,20 +2,20 @@ package com.timesheetspro_api.employeeStatements.serviceImpl;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
-import java.time.DayOfWeek;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
+import java.time.*;
 
 import com.timesheetspro_api.common.dto.employeeStatement.EmployeeSalaryStatementDto;
 import com.timesheetspro_api.common.dto.employeeStatement.SalaryStatementRequestDto;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.UserInOut.UserInOut;
+import com.timesheetspro_api.common.model.attendancePenaltyRules.AttendancePenaltyRules;
 import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
 import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
 import com.timesheetspro_api.common.repository.OvertimeRulesRepository;
 import com.timesheetspro_api.common.repository.UserInOutRepository;
+import com.timesheetspro_api.common.repository.company.AttendancePenaltyRulesRepository;
 import com.timesheetspro_api.common.repository.company.CompanyEmployeeRepository;
 import com.timesheetspro_api.common.service.CommonService;
 import com.timesheetspro_api.common.specification.EmployeeStatementSpecification;
@@ -26,9 +26,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.sql.Date;
-import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service(value = "EmployeeSalaryStatementService")
 public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStatementService {
@@ -41,6 +39,9 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
     @Autowired
     private OvertimeRulesRepository overtimeRulesRepository;
+
+    @Autowired
+    private AttendancePenaltyRulesRepository attendancePenaltyRulesRepository;
 
     @Autowired
     private CommonService commonService;
@@ -144,6 +145,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         Map<LocalDate, Long> dailyWorkedMinutes = new HashMap<>();
         Set<LocalDate> actualWorkDays = new HashSet<>();
         long totalWorkedMillis = 0;
+        int penaltyAmount = 0;
 
         for (UserInOut userInOut : userInOutList) {
             dto.setClockInOutId(userInOut.getId());
@@ -160,9 +162,16 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 long workedMinutes = workedMillis / (1000 * 60);
                 dailyWorkedMinutes.merge(date, workedMinutes, Long::sum);
                 actualWorkDays.add(date);
+
+                // Calculate penalty amount
+                if (companyEmployee.getPenaltyRule()) {
+                    if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
+                        penaltyAmount = calculatePenalty(companyEmployee, userInOut.getTimeIn());
+                    }
+                }
             }
         }
-
+        System.out.println("=========== penaltyAmount ============" + penaltyAmount);
         // Calculate overtime
         int employeeShiftHours = companyEmployee.getCompanyShift() != null ? companyEmployee.getCompanyShift().getTotalHours() : 0;
         long employeeWorkedMinutes = totalWorkedMillis / (1000 * 60);
@@ -188,12 +197,13 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
         // Calculate canteen deductions
         int otherDeductions = calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays);
-        int totalDeductions = pfAmount + ptAmount + otherDeductions;
+        int totalDeductions = pfAmount + ptAmount + otherDeductions + penaltyAmount;
 
         // Calculate earnings
         long dailySalary = companyEmployee.getBasicSalary() / 30;
         int baseSalary = (int) (dailySalary * (totalPaidDays + actualWorkDays.size()));
         int totalEarnings = baseSalary + otAmountFinal;
+
 
 //        if (companyEmployee.getEmployeeId() == 94) {
 //            System.out.println("Debugging Employee Salary Statement for Employee ID: " + companyEmployee.getEmployeeId());
@@ -218,6 +228,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         dto.setTotalDays((actualWorkDays.size() + totalPaidDays));
         dto.setTotalEarnSalary(baseSalary);
         dto.setOtherDeductions(otherDeductions);
+        dto.setTotalPenaltyAmount(penaltyAmount);
         dto.setTotalEarnings(totalEarnings);
         dto.setTotalDeductions(totalDeductions);
         dto.setNetSalary(totalEarnings - totalDeductions);
@@ -319,6 +330,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         OvertimeRules rule = employee.getOvertimeRules();
         Float otPayPerSlab = rule.getOtAmount();
         if (otPayPerSlab == null) return 0;
+        Integer dailySalary = employee.getBasicSalary() / 30;
 
         switch (rule.getOtType()) {
             case "Fixed Amount":
@@ -327,15 +339,15 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 long otHours = (long) Math.ceil(otMinutes / 60.0);
                 return (int) (otHours * otPayPerSlab);
             case "1x Salary":
-                return employee.getBasicSalary();
+                return dailySalary;
             case "1.5x Salary":
-                return (int) (employee.getBasicSalary() * 1.5);
+                return (int) (dailySalary * 1.5);
             case "2x Salary":
-                return employee.getBasicSalary() * 2;
+                return dailySalary * 2;
             case "2.5x Salary":
-                return (int) (employee.getBasicSalary() * 2.5);
+                return (int) (dailySalary * 2.5);
             case "3x Salary":
-                return employee.getBasicSalary() * 3;
+                return dailySalary * 3;
             default:
                 return 0;
         }
@@ -384,4 +396,88 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 //        }
         return (lightDays * perDayAmount * 2) + (heavyWorkingDays * perDayAmount);
     }
+
+    // ===== Helper: compute penalty given a rule & day salary
+    private int computePenalty(AttendancePenaltyRules rule, int daySalary) {
+        return switch (rule.getDeductionType()) {
+            case "Fixed Amount"    -> rule.getAmount();
+            case "Half Day Salary" -> (daySalary / 2);
+            case "1 day Salary"    -> daySalary;
+            case "1.5 day Salary"  -> (int) (daySalary * 1.5);
+            case "2 day Salary"    -> daySalary * 2;
+            case "2.5 day Salary"  -> (int) (daySalary * 2.5);
+            case "3 day Salary"    -> daySalary * 3;
+            default                -> 0;
+        };
+    }
+
+    // ===== Main: calculate penalty amount (robust, fast)
+    private int calculatePenalty(CompanyEmployee employee, java.util.Date timeInDate) {
+        // ---- Guards
+        if (employee == null || timeInDate == null || employee.getCompanyShift() == null) return 0;
+        Timestamp shiftStartTs = employee.getCompanyShift().getStartTime();
+        Timestamp shiftEndTs   = employee.getCompanyShift().getEndTime();
+        if (shiftStartTs == null || shiftEndTs == null) return 0;
+
+        // ---- Salary/day (guard divide-by-zero)
+        Integer basic = employee.getBasicSalary();
+        if (basic == null || basic <= 0) return 0;
+        int daySalary = basic / 30;
+
+        // ---- Zone & times
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDateTime actualIn = timeInDate.toInstant().atZone(zone).toLocalDateTime();
+
+        // Take only time-of-day from DB
+        LocalTime rawStart = shiftStartTs.toInstant().atZone(zone).toLocalTime();
+
+        // ===== Heuristic fallback =====
+        // If DB saved 00:00 but user clocks in >= 12:00, assume intended 12:00 (noon).
+        // This fixes your 764/731 minute symptom while you correct data entry going forward.
+        LocalTime shiftStartTOD = rawStart;
+        if (shiftStartTOD.equals(LocalTime.MIDNIGHT) && actualIn.getHour() >= 12) {
+            shiftStartTOD = LocalTime.NOON; // 12:00
+        }
+
+        // Rebuild expected start with SAME DATE as timeIn
+        LocalDateTime expectedStart = LocalDateTime.of(actualIn.toLocalDate(), shiftStartTOD);
+
+        long lateMinutes = Duration.between(expectedStart, actualIn).toMinutes();
+        if (lateMinutes <= 0) return 0; // on-time or early
+
+        // ---- Debug (leave for validation; remove later)
+        System.out.println("[PenaltyCalc] rawStart=" + rawStart
+                + " | chosenStartTOD=" + shiftStartTOD
+                + " | expectedStart=" + expectedStart
+                + " | actualIn=" + actualIn
+                + " | lateMinutes=" + lateMinutes);
+
+        // ---- Load & sort rules
+        List<AttendancePenaltyRules> rules =
+                attendancePenaltyRulesRepository.findByCompanyId(employee.getCompanyDetails().getId());
+        if (rules == null || rules.isEmpty()) return 0;
+
+        rules.sort(Comparator.comparingInt(AttendancePenaltyRules::getMinutes));
+
+        // ---- Binary search: largest rule.minutes <= lateMinutes
+        int lo = 0, hi = rules.size() - 1, idx = -1;
+        while (lo <= hi) {
+            int mid = (lo + hi) >>> 1;
+            int m = rules.get(mid).getMinutes();
+            if (m <= lateMinutes) { idx = mid; lo = mid + 1; }
+            else { hi = mid - 1; }
+        }
+        if (idx < 0) return 0;
+
+        int penalty = computePenalty(rules.get(idx), daySalary);
+        System.out.println("[PenaltyCalc] appliedRuleMinutes=" + rules.get(idx).getMinutes() +
+                " | penalty=" + penalty);
+
+        return penalty;
+    }
+
+
+
+
+
 }
