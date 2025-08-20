@@ -48,4 +48,7 @@ public class AttendancePenaltyRules {
 
     @Column(name = "count")
     private Integer count;
+
+    @Column(name = "is_early_exit")
+    private Boolean isEarlyExit;
 }

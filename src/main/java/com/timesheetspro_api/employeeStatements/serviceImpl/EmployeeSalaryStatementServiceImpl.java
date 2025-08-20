@@ -164,14 +164,24 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 actualWorkDays.add(date);
 
                 // Calculate penalty amount
-                if (companyEmployee.getPenaltyRule()) {
+                if (companyEmployee.getLateEntryPenaltyRule()) {
                     if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
-                        penaltyAmount = calculatePenalty(companyEmployee, userInOut.getTimeIn());
+                        int latePenalty = calculateLateEntryPenalty(companyEmployee, userInOut.getTimeIn());
+                        System.out.println("Late Entry Penalty for " + companyEmployee.getUsername() + ": " + latePenalty);
+                        penaltyAmount += latePenalty;
+                    }
+                }
+                if (companyEmployee.getEarlyExitPenaltyRule()) {
+
+                    if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
+                        int earlyPenalty = calculateEarlyExitPenalty(companyEmployee, userInOut.getTimeOut());
+                        System.out.println("Early Exit Penalty for " + companyEmployee.getUsername() + ": " + earlyPenalty);
+                        penaltyAmount += earlyPenalty;
                     }
                 }
             }
         }
-        System.out.println("=========== penaltyAmount ============" + penaltyAmount);
+        System.out.println("====== totalPenaltyAmount ======" + penaltyAmount);
         // Calculate overtime
         int employeeShiftHours = companyEmployee.getCompanyShift() != null ? companyEmployee.getCompanyShift().getTotalHours() : 0;
         long employeeWorkedMinutes = totalWorkedMillis / (1000 * 60);
@@ -196,7 +206,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         dto.setPtAmount(ptAmount);
 
         // Calculate canteen deductions
-        int otherDeductions = calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays);
+        int otherDeductions = calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays) + penaltyAmount;
         int totalDeductions = pfAmount + ptAmount + otherDeductions + penaltyAmount;
 
         // Calculate earnings
@@ -397,87 +407,100 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         return (lightDays * perDayAmount * 2) + (heavyWorkingDays * perDayAmount);
     }
 
-    // ===== Helper: compute penalty given a rule & day salary
-    private int computePenalty(AttendancePenaltyRules rule, int daySalary) {
+    // ===== Helper: compute penalty given a rule, day salary & shift hours
+    private int computePenalty(AttendancePenaltyRules rule, int daySalary, int totalHours) {
+//        if (totalHours == null || totalHours <= 0) totalHours = 8; // fallback
+        System.out.println("computePenalty: rule = " + rule.getDeductionType() + ", daySalary = " + daySalary + ", totalHours = " + totalHours);
+        float perHourSalary = daySalary / (float) totalHours;
+        perHourSalary = new BigDecimal(perHourSalary).setScale(2, RoundingMode.HALF_UP).floatValue();
+        float perMinuteSalary = perHourSalary / 60f;
+        perMinuteSalary = new BigDecimal(perMinuteSalary).setScale(2, RoundingMode.HALF_UP).floatValue();
+
         return switch (rule.getDeductionType()) {
-            case "Fixed Amount"    -> rule.getAmount();
-            case "Half Day Salary" -> (daySalary / 2);
-            case "1 day Salary"    -> daySalary;
-            case "1.5 day Salary"  -> (int) (daySalary * 1.5);
-            case "2 day Salary"    -> daySalary * 2;
-            case "2.5 day Salary"  -> (int) (daySalary * 2.5);
-            case "3 day Salary"    -> daySalary * 3;
-            default                -> 0;
+            case "Fixed Amount" -> rule.getAmount();
+            case "5 Min Salary" -> (int) Math.round(perMinuteSalary * 5);
+            case "15 Min Salary" -> (int) Math.round(perMinuteSalary * 15);
+            case "30 Min Salary" -> (int) Math.round(perMinuteSalary * 30);
+            case "1 Hour Salary" -> (int) Math.round(perHourSalary);
+            case "Half Day Salary" -> daySalary / 2;
+            case "1 day Salary" -> daySalary;
+            case "1.5 day Salary" -> (int) Math.round(daySalary * 1.5);
+            case "2 day Salary" -> daySalary * 2;
+            case "2.5 day Salary" -> (int) Math.round(daySalary * 2.5);
+            case "3 day Salary" -> daySalary * 3;
+            default -> 0;
         };
     }
 
-    // ===== Main: calculate penalty amount (robust, fast)
-    private int calculatePenalty(CompanyEmployee employee, java.util.Date timeInDate) {
-        // ---- Guards
-        if (employee == null || timeInDate == null || employee.getCompanyShift() == null) return 0;
+    // ===== Main: calculate LATE ENTRY penalty amount
+    private int calculateLateEntryPenalty(CompanyEmployee employee, java.util.Date timeInDate) {
         Timestamp shiftStartTs = employee.getCompanyShift().getStartTime();
-        Timestamp shiftEndTs   = employee.getCompanyShift().getEndTime();
-        if (shiftStartTs == null || shiftEndTs == null) return 0;
+        if (shiftStartTs == null) return 0;
 
-        // ---- Salary/day (guard divide-by-zero)
         Integer basic = employee.getBasicSalary();
         if (basic == null || basic <= 0) return 0;
         int daySalary = basic / 30;
+        Integer totalHours = employee.getCompanyShift().getTotalHours();
 
-        // ---- Zone & times
         ZoneId zone = ZoneId.systemDefault();
         LocalDateTime actualIn = timeInDate.toInstant().atZone(zone).toLocalDateTime();
-
-        // Take only time-of-day from DB
         LocalTime rawStart = shiftStartTs.toInstant().atZone(zone).toLocalTime();
 
-        // ===== Heuristic fallback =====
-        // If DB saved 00:00 but user clocks in >= 12:00, assume intended 12:00 (noon).
-        // This fixes your 764/731 minute symptom while you correct data entry going forward.
-        LocalTime shiftStartTOD = rawStart;
-        if (shiftStartTOD.equals(LocalTime.MIDNIGHT) && actualIn.getHour() >= 12) {
-            shiftStartTOD = LocalTime.NOON; // 12:00
+        if (rawStart.equals(LocalTime.MIDNIGHT) && actualIn.getHour() >= 12) {
+            rawStart = LocalTime.NOON;
         }
 
-        // Rebuild expected start with SAME DATE as timeIn
-        LocalDateTime expectedStart = LocalDateTime.of(actualIn.toLocalDate(), shiftStartTOD);
-
+        LocalDateTime expectedStart = LocalDateTime.of(actualIn.toLocalDate(), rawStart);
         long lateMinutes = Duration.between(expectedStart, actualIn).toMinutes();
-        if (lateMinutes <= 0) return 0; // on-time or early
+        if (lateMinutes <= 0) return 0;
+        return pickAndApplyRule(employee, daySalary, totalHours, lateMinutes, false);
+    }
 
-        // ---- Debug (leave for validation; remove later)
-        System.out.println("[PenaltyCalc] rawStart=" + rawStart
-                + " | chosenStartTOD=" + shiftStartTOD
-                + " | expectedStart=" + expectedStart
-                + " | actualIn=" + actualIn
-                + " | lateMinutes=" + lateMinutes);
+    // ===== Main: calculate EARLY EXIT penalty amount
+    private int calculateEarlyExitPenalty(CompanyEmployee employee, java.util.Date timeOutDate) {
+        Timestamp shiftEndTs = employee.getCompanyShift().getEndTime();
+        if (shiftEndTs == null) return 0;
 
-        // ---- Load & sort rules
+        Integer basic = employee.getBasicSalary();
+        if (basic == null || basic <= 0) return 0;
+        int daySalary = basic / 30;
+        Integer totalHours = employee.getCompanyShift().getTotalHours();
+
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDateTime actualOut = timeOutDate.toInstant().atZone(zone).toLocalDateTime();
+        LocalTime rawEnd = shiftEndTs.toInstant().atZone(zone).toLocalTime();
+
+        if (rawEnd.equals(LocalTime.MIDNIGHT) && actualOut.getHour() <= 12) {
+            rawEnd = LocalTime.NOON;
+        }
+
+        LocalDateTime expectedEnd = LocalDateTime.of(actualOut.toLocalDate(), rawEnd);
+        long earlyMinutes = Duration.between(actualOut, expectedEnd).toMinutes(); // reverse direction
+        if (earlyMinutes <= 0) return 0;
+        return pickAndApplyRule(employee, daySalary, totalHours, earlyMinutes, true);
+    }
+
+    // ===== Shared: pick rule & apply
+    private int pickAndApplyRule(CompanyEmployee employee, int daySalary, int totalHours, long diffMinutes, boolean type) {
         List<AttendancePenaltyRules> rules =
-                attendancePenaltyRulesRepository.findByCompanyId(employee.getCompanyDetails().getId());
+                attendancePenaltyRulesRepository.findByCompanyId(employee.getCompanyDetails().getId(), type);
         if (rules == null || rules.isEmpty()) return 0;
 
         rules.sort(Comparator.comparingInt(AttendancePenaltyRules::getMinutes));
 
-        // ---- Binary search: largest rule.minutes <= lateMinutes
-        int lo = 0, hi = rules.size() - 1, idx = -1;
-        while (lo <= hi) {
-            int mid = (lo + hi) >>> 1;
-            int m = rules.get(mid).getMinutes();
-            if (m <= lateMinutes) { idx = mid; lo = mid + 1; }
-            else { hi = mid - 1; }
+        AttendancePenaltyRules chosenRule = null;
+        for (AttendancePenaltyRules r : rules) {
+            if (diffMinutes >= r.getMinutes()) {
+                chosenRule = r; // keep last that satisfies
+            } else if (chosenRule == null) {
+                // fallback: if no smaller rule exists, pick the first greater one
+                chosenRule = r;
+            }
+            // don’t break, so you get the best match
         }
-        if (idx < 0) return 0;
+        if (chosenRule == null) return 0;
 
-        int penalty = computePenalty(rules.get(idx), daySalary);
-        System.out.println("[PenaltyCalc] appliedRuleMinutes=" + rules.get(idx).getMinutes() +
-                " | penalty=" + penalty);
-
-        return penalty;
+        return computePenalty(chosenRule, daySalary, totalHours);
     }
-
-
-
-
 
 }

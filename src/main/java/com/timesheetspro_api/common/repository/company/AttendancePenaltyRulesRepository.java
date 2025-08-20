@@ -10,18 +10,18 @@ import java.util.List;
 
 @Repository
 public interface AttendancePenaltyRulesRepository extends JpaRepository<AttendancePenaltyRules, Integer> {
-    @Query("SELECT a FROM AttendancePenaltyRules a WHERE a.companyDetails.id=:id")
-    List<AttendancePenaltyRules> findByCompanyId(Integer id);
+    @Query("SELECT a FROM AttendancePenaltyRules a WHERE a.companyDetails.id=:id AND a.isEarlyExit=:flag")
+    List<AttendancePenaltyRules> findByCompanyId(Integer id, @Param("flag") Boolean flag);
 
-    @Query("SELECT a FROM AttendancePenaltyRules a WHERE a.ruleName =:ruleName AND a.companyDetails.id=:companyId")
-    AttendancePenaltyRules findByCompanyIdAndName(@Param("ruleName") String ruleName, @Param("companyId") Integer companyId);
+    @Query("SELECT a FROM AttendancePenaltyRules a WHERE a.ruleName =:ruleName AND a.companyDetails.id=:companyId AND a.isEarlyExit=:flag")
+    AttendancePenaltyRules findByCompanyIdAndName(@Param("ruleName") String ruleName, @Param("companyId") Integer companyId, @Param("flag") Boolean flag);
 
-    @Query("SELECT a FROM AttendancePenaltyRules a WHERE a.minutes =:minutes AND a.companyDetails.id=:companyId")
-    AttendancePenaltyRules findByCompanyIdAndMinutes(@Param("minutes") Integer minutes, @Param("companyId") Integer companyId);
+    @Query("SELECT a FROM AttendancePenaltyRules a WHERE a.minutes =:minutes AND a.companyDetails.id=:companyId AND a.isEarlyExit=:flag")
+    AttendancePenaltyRules findByCompanyIdAndMinutes(@Param("minutes") Integer minutes, @Param("companyId") Integer companyId, @Param("flag") Boolean flag);
 
-    @Query("SELECT a FROM AttendancePenaltyRules a WHERE a.ruleName =:ruleName AND a.companyDetails.id=:companyId AND a.id!=:id")
-    AttendancePenaltyRules findAllExceptByCompanyId(@Param("ruleName") String ruleName, @Param("id") Integer id, @Param("companyId") Integer companyId);
+    @Query("SELECT a FROM AttendancePenaltyRules a WHERE a.ruleName =:ruleName AND a.companyDetails.id=:companyId AND a.id!=:id AND a.isEarlyExit=:flag")
+    AttendancePenaltyRules findAllExceptByCompanyId(@Param("ruleName") String ruleName, @Param("id") Integer id, @Param("companyId") Integer companyId,@Param("flag") Boolean flag);
 
-    @Query("SELECT a FROM AttendancePenaltyRules a WHERE a.minutes =:minutes AND a.companyDetails.id=:companyId AND a.id!=:id")
-    AttendancePenaltyRules findAllExceptByCompanyIdWithMinutes(@Param("minutes") Integer minutes, @Param("id") Integer id, @Param("companyId") Integer companyId);
+    @Query("SELECT a FROM AttendancePenaltyRules a WHERE a.minutes =:minutes AND a.companyDetails.id=:companyId AND a.id!=:id AND a.isEarlyExit=:flag")
+    AttendancePenaltyRules findAllExceptByCompanyIdWithMinutes(@Param("minutes") Integer minutes, @Param("id") Integer id, @Param("companyId") Integer companyId,@Param("flag") Boolean flag);
 }

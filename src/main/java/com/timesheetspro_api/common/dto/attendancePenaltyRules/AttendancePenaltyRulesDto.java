@@ -17,4 +17,5 @@ public class AttendancePenaltyRulesDto {
     private String deductionType;
     private Integer amount;
     private Integer count;
+    private Boolean isEarlyExit;
 }

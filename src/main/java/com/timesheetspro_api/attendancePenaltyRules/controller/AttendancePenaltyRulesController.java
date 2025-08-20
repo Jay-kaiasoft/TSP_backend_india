@@ -16,11 +16,11 @@ public class AttendancePenaltyRulesController {
     @Autowired
     private AttendancePenaltyRulesService attendancePenaltyRulesService;
 
-    @GetMapping("/get/all/{companyId}")
-    public ApiResponse<?> findAllByCompanyId(@PathVariable String companyId) {
+    @GetMapping("/get/all/{flag}/{companyId}")
+    public ApiResponse<?> findAllByCompanyId(@PathVariable String flag, @PathVariable String companyId) {
         Map<String, Object> resBody = new HashMap<>();
         try {
-            return new ApiResponse<>(HttpStatus.OK.value(), "Fetch attendance penalty rules successfully", this.attendancePenaltyRulesService.findAllByCompanyId(Integer.parseInt(companyId)));
+            return new ApiResponse<>(HttpStatus.OK.value(), "Fetch attendance penalty rules successfully", this.attendancePenaltyRulesService.findAllByCompanyId(Integer.parseInt(flag), Integer.parseInt(companyId)));
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to fetch attendance penalty rules", resBody);
         }

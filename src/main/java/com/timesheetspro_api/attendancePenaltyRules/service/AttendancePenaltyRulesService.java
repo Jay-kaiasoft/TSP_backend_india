@@ -5,7 +5,7 @@ import com.timesheetspro_api.common.dto.attendancePenaltyRules.AttendancePenalty
 import java.util.List;
 
 public interface AttendancePenaltyRulesService {
-    List<AttendancePenaltyRulesDto> findAllByCompanyId(Integer companyId);
+    List<AttendancePenaltyRulesDto> findAllByCompanyId(Integer flag, Integer companyId);
 
     AttendancePenaltyRulesDto findById(Integer id);
 

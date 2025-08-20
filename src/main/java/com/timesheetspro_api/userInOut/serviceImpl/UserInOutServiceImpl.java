@@ -533,8 +533,9 @@ public class UserInOutServiceImpl implements UserInOutService {
             if (userInOutDto.getTimeIn() != null) {
                 userInOut.setTimeIn(this.convertISOToDate(userInOutDto.getTimeIn()));
             } else {
-                Date currentDate = new Date();
-                userInOut.setTimeIn(currentDate);
+//                Date currentDate = new Date();
+//                userInOut.setTimeIn(currentDate);
+                throw new RuntimeException("Clock In is required");
             }
             if (userInOutDto.getTimeOut() != null) {
                 userInOut.setTimeOut(this.convertISOToDate(userInOutDto.getTimeOut()));

@@ -28,9 +28,9 @@ public class AttendancePenaltyRulesServiceImpl implements AttendancePenaltyRules
     private CompanyEmployeeRepository companyEmployeeRepository;
 
     @Override
-    public List<AttendancePenaltyRulesDto> findAllByCompanyId(Integer companyId) {
+    public List<AttendancePenaltyRulesDto> findAllByCompanyId(Integer flag, Integer companyId) {
         try {
-            List<AttendancePenaltyRules> attendancePenaltyRulesList = this.attendancePenaltyRulesRepository.findByCompanyId(companyId);
+            List<AttendancePenaltyRules> attendancePenaltyRulesList = this.attendancePenaltyRulesRepository.findByCompanyId(companyId, flag == 1);
             List<AttendancePenaltyRulesDto> attendancePenaltyRulesDtoList = new ArrayList<>();
 
             if (!attendancePenaltyRulesList.isEmpty()) {
@@ -66,9 +66,9 @@ public class AttendancePenaltyRulesServiceImpl implements AttendancePenaltyRules
     public AttendancePenaltyRulesDto create(AttendancePenaltyRulesDto attendancePenaltyRulesDto) {
         try {
             AttendancePenaltyRules existingRule = attendancePenaltyRulesRepository
-                    .findByCompanyIdAndName(attendancePenaltyRulesDto.getRuleName(), attendancePenaltyRulesDto.getCompanyId());
+                    .findByCompanyIdAndName(attendancePenaltyRulesDto.getRuleName(), attendancePenaltyRulesDto.getCompanyId(),attendancePenaltyRulesDto.getIsEarlyExit());
             AttendancePenaltyRules existingRuleWithMinutes = attendancePenaltyRulesRepository
-                    .findByCompanyIdAndMinutes(attendancePenaltyRulesDto.getMinutes(), attendancePenaltyRulesDto.getCompanyId());
+                    .findByCompanyIdAndMinutes(attendancePenaltyRulesDto.getMinutes(), attendancePenaltyRulesDto.getCompanyId(),attendancePenaltyRulesDto.getIsEarlyExit());
             if (existingRule != null) {
                 throw new RuntimeException("Penalty rule already exists with name " + attendancePenaltyRulesDto.getRuleName());
             }
@@ -95,10 +95,10 @@ public class AttendancePenaltyRulesServiceImpl implements AttendancePenaltyRules
     public AttendancePenaltyRulesDto update(Integer id, AttendancePenaltyRulesDto attendancePenaltyRulesDto) {
         try {
             AttendancePenaltyRules existingRule = attendancePenaltyRulesRepository
-                    .findAllExceptByCompanyId(attendancePenaltyRulesDto.getRuleName(), id, attendancePenaltyRulesDto.getCompanyId());
+                    .findAllExceptByCompanyId(attendancePenaltyRulesDto.getRuleName(), id, attendancePenaltyRulesDto.getCompanyId(),attendancePenaltyRulesDto.getIsEarlyExit());
 
             AttendancePenaltyRules existingRuleWithMinutes = attendancePenaltyRulesRepository
-                    .findAllExceptByCompanyIdWithMinutes(attendancePenaltyRulesDto.getMinutes(), id, attendancePenaltyRulesDto.getCompanyId());
+                    .findAllExceptByCompanyIdWithMinutes(attendancePenaltyRulesDto.getMinutes(), id, attendancePenaltyRulesDto.getCompanyId(),attendancePenaltyRulesDto.getIsEarlyExit());
 
             if (existingRule != null) {
                 throw new RuntimeException("Penalty rule already exists with name " + attendancePenaltyRulesDto.getRuleName());
@@ -113,10 +113,6 @@ public class AttendancePenaltyRulesServiceImpl implements AttendancePenaltyRules
                     .orElseThrow(() -> new RuntimeException("Company not found"));
             attendancePenaltyRules.setCompanyDetails(companyDetails);
 
-            CompanyEmployee companyEmployee = companyEmployeeRepository.findById(attendancePenaltyRulesDto.getCreatedBy())
-                    .orElseThrow(() -> new RuntimeException("Company employee not found"));
-
-            attendancePenaltyRules.setCompanyEmployee(companyEmployee);
             BeanUtils.copyProperties(attendancePenaltyRulesDto, attendancePenaltyRules, "id");
             this.attendancePenaltyRulesRepository.save(attendancePenaltyRules);
             return attendancePenaltyRulesDto;

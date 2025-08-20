@@ -187,8 +187,11 @@ public class CompanyEmployee implements UserDetails {
     @JoinColumn(name = "weekly_off", referencedColumnName = "id")
     private WeeklyOff weeklyOff;
 
-    @Column(name = "penalty_rule")
-    private Boolean penaltyRule;
+    @Column(name = "late_entry_penalty_rule")
+    private Boolean lateEntryPenaltyRule;
+
+    @Column(name = "early_exit_penalty_rule")
+    private Boolean earlyExitPenaltyRule;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
