@@ -14,4 +14,10 @@ public interface WeeklyOffRepository extends JpaRepository<WeeklyOff, Integer> {
 
     @Query("SELECT w FROM WeeklyOff w WHERE w.companyDetails.id=:id")
     List<WeeklyOff> findByCompany(Integer id);
+
+    @Query("SELECT w FROM WeeklyOff w WHERE w.isDefault = 1")
+    WeeklyOff findDefault();
+
+    @Query("SELECT w FROM WeeklyOff w WHERE w.isDefault = 1 AND w.id != :id")
+    WeeklyOff findDefaultExcludeId(Integer id);
 }

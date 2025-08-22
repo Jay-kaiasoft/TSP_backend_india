@@ -11,4 +11,5 @@ public interface WeeklyOffService {
     WeeklyOffDto create(WeeklyOffDto dto);
     WeeklyOffDto update(Integer id, WeeklyOffDto dto);
     void delete(Integer id);
+    void assignDefaultWeeklyOff(Integer id);
 }

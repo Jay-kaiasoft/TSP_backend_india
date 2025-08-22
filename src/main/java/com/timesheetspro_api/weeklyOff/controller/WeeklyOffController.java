@@ -86,4 +86,15 @@ public class WeeklyOffController {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
         }
     }
+
+    @GetMapping("/assignDefaultTemplate/{id}")
+    public ApiResponse<?> assignDefaultTemplate(@PathVariable Integer id) {
+        Map<String, Object> resBody = new HashMap<>();
+        try {
+            this.weeklyOffService.assignDefaultWeeklyOff(id);
+            return new ApiResponse<>(HttpStatus.OK.value(),"This template is set as default.", "");
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
+        }
+    }
 }

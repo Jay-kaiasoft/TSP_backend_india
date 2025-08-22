@@ -29,7 +29,7 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
     @Override
     public boolean assignEmployees(List<Integer> employeeIds, Integer weeklyOffId) {
         try {
-            if (!employeeIds.isEmpty()){
+            if (!employeeIds.isEmpty()) {
                 WeeklyOff weeklyOff = this.repository.findById(weeklyOffId)
                         .orElseThrow(() -> new IllegalArgumentException("Weekly off not found"));
                 for (Integer employeeId : employeeIds) {
@@ -84,7 +84,7 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
             if (!hasAnyFlag(dto)) {
                 throw new IllegalArgumentException("At least one weekly off must be selected");
             }
-            WeeklyOff isExites= this.repository.existsByName(dto.getName());
+            WeeklyOff isExites = this.repository.existsByName(dto.getName());
             if (isExites != null) {
                 throw new IllegalArgumentException("Template name already exists");
             }
@@ -94,7 +94,7 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
             weeklyOff.setCompanyEmployee(companyEmployeeRepository.findById(dto.getCreatedBy())
                     .orElseThrow(() -> new IllegalArgumentException("Employee not found")));
 
-            BeanUtils.copyProperties(dto, weeklyOff,"id", "companyDetails", "companyEmployee");
+            BeanUtils.copyProperties(dto, weeklyOff, "id", "companyDetails", "companyEmployee");
             this.repository.save(weeklyOff);
             return dto;
         } catch (Exception e) {
@@ -114,7 +114,7 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
                     .orElseThrow(() -> new IllegalArgumentException("Company not found")));
             weeklyOff.setCompanyEmployee(companyEmployeeRepository.findById(dto.getCreatedBy())
                     .orElseThrow(() -> new IllegalArgumentException("Employee not found")));
-            BeanUtils.copyProperties(dto, weeklyOff,"id");
+            BeanUtils.copyProperties(dto, weeklyOff, "id");
             this.repository.save(weeklyOff);
             return dto;
         } catch (Exception e) {
@@ -128,6 +128,23 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
             WeeklyOff weeklyOff = this.repository.findById(id).orElseThrow(() -> new IllegalArgumentException("Weekly off not found"));
             this.repository.delete(weeklyOff);
         } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void assignDefaultWeeklyOff(Integer id) {
+        try {
+            WeeklyOff weeklyOff = this.repository.findById(id).orElseThrow(() -> new IllegalArgumentException("Weekly off not found"));
+            weeklyOff.setIsDefault(weeklyOff.getIsDefault().equals(1) ? 0 : 1);
+            WeeklyOff defaultWeeklyOff = this.repository.findDefaultExcludeId(id);
+            if (defaultWeeklyOff != null) {
+                defaultWeeklyOff.setIsDefault(0);
+                this.repository.save(defaultWeeklyOff);
+            }
+            this.repository.save(weeklyOff);
+        } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
