@@ -36,4 +36,13 @@ public interface CompanyEmployeeRepository extends JpaRepository<CompanyEmployee
 
     @Query("SELECT c FROM CompanyEmployee c WHERE c.department.id=:id")
     List<CompanyEmployee> findByDepartmentId(int id);
+
+    @Query("SELECT c FROM CompanyEmployee c WHERE c.holidayTemplates.id=:id")
+    List<CompanyEmployee> findByHolidayTemplateId(int id);
+
+    @Query("SELECT c FROM CompanyEmployee c WHERE c.weeklyOff.id=:id")
+    List<CompanyEmployee> findByWeeklyOffTemplateId(int id);
+
+    @Query("SELECT c FROM CompanyEmployee c WHERE c.overtimeRules.id=:id")
+    List<CompanyEmployee> findByOTId(int id);
 }

@@ -3,6 +3,8 @@ package com.timesheetspro_api.common.dto.weeklyOff;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class WeeklyOffDto {
     private Integer id;
@@ -66,4 +68,5 @@ public class WeeklyOffDto {
     private Integer companyId;
     private Integer createdBy;
     private String createdByUsername;
+    private List<Integer> assignedEmployeeIds;
 }

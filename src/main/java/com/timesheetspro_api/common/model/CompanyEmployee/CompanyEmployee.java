@@ -6,6 +6,7 @@ import com.timesheetspro_api.common.model.companyEmployeeRoles.CompanyEmployeeRo
 import com.timesheetspro_api.common.model.companyShift.CompanyShift;
 import com.timesheetspro_api.common.model.department.Department;
 import com.timesheetspro_api.common.model.employeeType.EmployeeType;
+import com.timesheetspro_api.common.model.holidayTemplates.HolidayTemplates;
 import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
 import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
 import jakarta.persistence.*;
@@ -186,6 +187,10 @@ public class CompanyEmployee implements UserDetails {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "weekly_off", referencedColumnName = "id")
     private WeeklyOff weeklyOff;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "holiday_template", referencedColumnName = "id")
+    private HolidayTemplates holidayTemplates;
 
     @Column(name = "late_entry_penalty_rule")
     private Boolean lateEntryPenaltyRule;

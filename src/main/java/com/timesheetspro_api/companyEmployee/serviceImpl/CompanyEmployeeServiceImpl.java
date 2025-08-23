@@ -12,6 +12,7 @@ import com.timesheetspro_api.common.model.companyShift.CompanyShift;
 import com.timesheetspro_api.common.model.department.Department;
 import com.timesheetspro_api.common.model.employeeBackAccountInfo.EmployeeBackAccountInfo;
 import com.timesheetspro_api.common.model.employeeType.EmployeeType;
+import com.timesheetspro_api.common.model.holidayTemplates.HolidayTemplates;
 import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
 import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
 import com.timesheetspro_api.common.repository.DepartmentRepository;
@@ -81,6 +82,9 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
 
     @Autowired
     private WeeklyOffRepository weeklyOffRepository;
+
+    @Autowired
+    private HolidayTemplatesRepository holidayTemplatesRepository;
 
     @Override
     public List<Map<String, Object>> getReports(int companyId, String type, int month) {
@@ -266,6 +270,11 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
             if (companyEmployee.getWeeklyOff() != null) {
                 companyEmployeeDto.setWeeklyOffId(companyEmployee.getWeeklyOff().getId());
             }
+
+            if (companyEmployee.getHolidayTemplates() != null){
+                companyEmployeeDto.setHolidayTemplateId(companyEmployee.getHolidayTemplates().getId());
+            }
+
             BeanUtils.copyProperties(companyEmployee, companyEmployeeDto);
 
             CompanyEmployeeRoles role = this.companyEmployeeRoleRepository.findById(companyEmployee.getRoles().getRoleId()).orElseThrow(() -> new RuntimeException("Role not found"));
@@ -319,6 +328,11 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 WeeklyOff weeklyOff = this.weeklyOffRepository.findDefault();
                 companyEmployee.setWeeklyOff(weeklyOff);
             }
+            if (companyEmployeeDto.getHolidayTemplateId() != null){
+                HolidayTemplates holidayTemplates = this.holidayTemplatesRepository.findById(companyEmployeeDto.getHolidayTemplateId()).orElseThrow(() -> new RuntimeException("Holiday template not found"));
+                companyEmployee.setHolidayTemplates(holidayTemplates);
+            }
+
             companyEmployee.setCompanyDetails(companyDetails);
             companyEmployee.setRoles(companyEmployeeRoles);
             companyEmployee.setDepartment(department);
@@ -372,7 +386,10 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 WeeklyOff weeklyOff = this.weeklyOffRepository.findDefault();
                 companyEmployee.setWeeklyOff(weeklyOff);
             }
-
+            if (companyEmployeeDto.getHolidayTemplateId() != null){
+                HolidayTemplates holidayTemplates = this.holidayTemplatesRepository.findById(companyEmployeeDto.getHolidayTemplateId()).orElseThrow(() -> new RuntimeException("Holiday template not found"));
+                companyEmployee.setHolidayTemplates(holidayTemplates);
+            }
             companyEmployee.setCompanyShift(companyShift);
             companyEmployee.setCompanyDetails(companyDetails);
             companyEmployee.setRoles(companyEmployeeRoles);

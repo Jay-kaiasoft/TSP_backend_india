@@ -71,6 +71,7 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
             dto.setCompanyId(weeklyOff.getCompanyDetails().getId());
             dto.setCreatedBy(weeklyOff.getCompanyEmployee().getEmployeeId());
             dto.setCreatedByUsername(weeklyOff.getCompanyEmployee().getUsername());
+            dto.setAssignedEmployeeIds(this.getAssignedEmployees(id));
             BeanUtils.copyProperties(weeklyOff, dto);
             return dto;
         } catch (Exception e) {
@@ -145,6 +146,23 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
             this.repository.save(weeklyOff);
         } catch (Exception e) {
             e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public List<Integer> getAssignedEmployees(Integer weeklyOffId) {
+        try {
+            List<CompanyEmployee> employees = this.companyEmployeeRepository.findByWeeklyOffTemplateId(weeklyOffId);
+            if (!employees.isEmpty()) {
+                List<Integer> employeeIds = new java.util.ArrayList<>();
+                for (CompanyEmployee employee : employees) {
+                    employeeIds.add(employee.getEmployeeId());
+                }
+                return employeeIds;
+            }
+            return java.util.Collections.emptyList();
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }

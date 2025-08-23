@@ -80,6 +80,7 @@ public class CompanyEmployeeDto {
     private Integer lunchBreak;
     private Integer workingHoursIncludeLunch;
     private Integer weeklyOffId;
+    private Integer holidayTemplateId;
     private Boolean earlyExitPenaltyRule;
     private Boolean lateEntryPenaltyRule;
 

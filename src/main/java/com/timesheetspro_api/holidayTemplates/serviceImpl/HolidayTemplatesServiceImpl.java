@@ -61,6 +61,7 @@ public class HolidayTemplatesServiceImpl implements HolidayTemplatesService {
             if (!holidayTemplateDetailsDtoList.isEmpty()) {
                 holidayTemplatesDto.setHolidayTemplateDetailsList(holidayTemplateDetailsDtoList);
             }
+            holidayTemplatesDto.setAssignedEmployeeIds(this.getAssignEmployees(id));
             return holidayTemplatesDto;
         } catch (Exception e) {
             e.printStackTrace();
@@ -79,7 +80,17 @@ public class HolidayTemplatesServiceImpl implements HolidayTemplatesService {
                     .orElseThrow(() -> new RuntimeException("Company Employee not found"));
             holidayTemplates.setCompanyEmployee(companyEmployee);
             holidayTemplates.setName(holidayTemplatesDto.getName());
-            this.holidayTemplatesRepository.save(holidayTemplates);
+            HolidayTemplates newHolidayTemplates = this.holidayTemplatesRepository.save(holidayTemplates);
+            if (newHolidayTemplates.getId() != null) {
+                if (!holidayTemplatesDto.getHolidayTemplateDetailsList().isEmpty()) {
+                    for (HolidayTemplateDetailsDto holidayTemplateDetailsDto : holidayTemplatesDto.getHolidayTemplateDetailsList()) {
+                        holidayTemplateDetailsDto.setHolidayTemplateId(newHolidayTemplates.getId());
+                        this.holidayTemplateDetailsService.createHolidayTemplateDetails(holidayTemplateDetailsDto);
+                    }
+                } else {
+                    throw new RuntimeException("Holiday list is required");
+                }
+            }
             return holidayTemplatesDto;
         } catch (Exception e) {
             e.printStackTrace();
@@ -99,6 +110,19 @@ public class HolidayTemplatesServiceImpl implements HolidayTemplatesService {
             holidayTemplates.setCompanyEmployee(companyEmployee);
             holidayTemplates.setName(holidayTemplatesDto.getName());
             this.holidayTemplatesRepository.save(holidayTemplates);
+            if (!holidayTemplatesDto.getHolidayTemplateDetailsList().isEmpty()) {
+                for (HolidayTemplateDetailsDto holidayTemplateDetailsDto : holidayTemplatesDto.getHolidayTemplateDetailsList()) {
+                    if (holidayTemplateDetailsDto.getId() != null) {
+                        holidayTemplateDetailsDto.setHolidayTemplateId(holidayTemplatesDto.getId());
+                        this.holidayTemplateDetailsService.updateHolidayTemplateDetails(holidayTemplateDetailsDto.getId(), holidayTemplateDetailsDto);
+                    } else {
+                        holidayTemplateDetailsDto.setHolidayTemplateId(id);
+                        this.holidayTemplateDetailsService.createHolidayTemplateDetails(holidayTemplateDetailsDto);
+                    }
+                }
+            } else {
+                throw new RuntimeException("Holiday list is required");
+            }
             return holidayTemplatesDto;
         } catch (Exception e) {
             e.printStackTrace();
@@ -113,6 +137,37 @@ public class HolidayTemplatesServiceImpl implements HolidayTemplatesService {
             this.holidayTemplatesRepository.delete(holidayTemplates);
         } catch (Exception e) {
             e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public boolean assignEmployees(Integer templateId, List<Integer> employeeIds) {
+        try {
+            HolidayTemplates holidayTemplates = this.holidayTemplatesRepository.findById(templateId).orElseThrow(() -> new RuntimeException("Holiday Template not found"));
+            for (Integer id : employeeIds) {
+                CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(id).orElseThrow(() -> new RuntimeException("Company Employee not found"));
+                companyEmployee.setHolidayTemplates(holidayTemplates);
+                this.companyEmployeeRepository.save(companyEmployee);
+            }
+            return true;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public List<Integer> getAssignEmployees(Integer templateId) {
+        try {
+            List<CompanyEmployee> companyEmployeeList = this.companyEmployeeRepository.findByHolidayTemplateId(templateId);
+            List<Integer> employeeIds = new ArrayList<>();
+            if (!companyEmployeeList.isEmpty()) {
+                for (CompanyEmployee companyEmployee : companyEmployeeList) {
+                    employeeIds.add(companyEmployee.getEmployeeId());
+                }
+            }
+            return employeeIds;
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }

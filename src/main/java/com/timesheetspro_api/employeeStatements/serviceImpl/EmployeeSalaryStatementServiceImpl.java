@@ -8,9 +8,12 @@ import java.time.*;
 
 import com.timesheetspro_api.common.dto.employeeStatement.EmployeeSalaryStatementDto;
 import com.timesheetspro_api.common.dto.employeeStatement.SalaryStatementRequestDto;
+import com.timesheetspro_api.common.dto.holidayTemplateDetails.HolidayTemplateDetailsDto;
+import com.timesheetspro_api.common.dto.holidayTemplates.HolidayTemplatesDto;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.UserInOut.UserInOut;
 import com.timesheetspro_api.common.model.attendancePenaltyRules.AttendancePenaltyRules;
+import com.timesheetspro_api.common.model.holidayTemplateDetails.HolidayTemplateDetails;
 import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
 import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
 import com.timesheetspro_api.common.repository.OvertimeRulesRepository;
@@ -21,11 +24,14 @@ import com.timesheetspro_api.common.service.CommonService;
 import com.timesheetspro_api.common.specification.EmployeeStatementSpecification;
 import com.timesheetspro_api.common.specification.UserInOutSpecification;
 import com.timesheetspro_api.employeeStatements.service.EmployeeSalaryStatementService;
+import com.timesheetspro_api.holidayTemplates.service.HolidayTemplatesService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.sql.Date;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Service(value = "EmployeeSalaryStatementService")
@@ -45,6 +51,9 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
     @Autowired
     private CommonService commonService;
+
+    @Autowired
+    private HolidayTemplatesService holidayTemplatesService;
 
     @Override
     public List<EmployeeSalaryStatementDto> getEmployeeSalaryStatements(SalaryStatementRequestDto salaryStatementRequestDto) {
@@ -167,7 +176,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 if (companyEmployee.getLateEntryPenaltyRule()) {
                     if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
                         int latePenalty = calculateLateEntryPenalty(companyEmployee, userInOut.getTimeIn());
-                        System.out.println("Late Entry Penalty for " + companyEmployee.getUsername() + ": " + latePenalty);
                         penaltyAmount += latePenalty;
                     }
                 }
@@ -175,13 +183,34 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
                     if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
                         int earlyPenalty = calculateEarlyExitPenalty(companyEmployee, userInOut.getTimeOut());
-                        System.out.println("Early Exit Penalty for " + companyEmployee.getUsername() + ": " + earlyPenalty);
                         penaltyAmount += earlyPenalty;
                     }
                 }
             }
         }
-        System.out.println("====== totalPenaltyAmount ======" + penaltyAmount);
+        if (companyEmployee.getHolidayTemplates() != null) {
+            HolidayTemplatesDto holidayTemplate = this.holidayTemplatesService
+                    .getHolidayTemplateById(companyEmployee.getHolidayTemplates().getId());
+
+            if (holidayTemplate != null && holidayTemplate.getHolidayTemplateDetailsList() != null
+                    && !holidayTemplate.getHolidayTemplateDetailsList().isEmpty()) {
+
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy, hh:mm:ss a", Locale.ENGLISH);
+
+                for (HolidayTemplateDetailsDto detail : holidayTemplate.getHolidayTemplateDetailsList()) {
+                    String dateStr = detail.getDate(); // "08/09/2025, 12:00:00 AM"
+                    if (dateStr != null && !dateStr.isBlank()) {
+                        try {
+                            LocalDate date = LocalDate.parse(dateStr, formatter);
+                            actualWorkDays.add(date);
+                        } catch (DateTimeParseException e) {
+                            throw new RuntimeException("Invalid date in holiday template: " + dateStr, e);
+                        }
+                    }
+                }
+            }
+        }
+
         // Calculate overtime
         int employeeShiftHours = companyEmployee.getCompanyShift() != null ? companyEmployee.getCompanyShift().getTotalHours() : 0;
         long employeeWorkedMinutes = totalWorkedMillis / (1000 * 60);
@@ -212,6 +241,12 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         // Calculate earnings
         long dailySalary = companyEmployee.getBasicSalary() / 30;
         int baseSalary = (int) (dailySalary * (totalPaidDays + actualWorkDays.size()));
+//        if (companyEmployee.getEmployeeId() == 96) {
+//            System.out.println("================ dailySalary ===============" + dailySalary);
+//            System.out.println("=============== actualWorkDays.size() ============" + actualWorkDays.size());
+//            System.out.println("|============== totalPaidDays ============" + totalPaidDays);
+//            System.out.println("============== baseSalary ============" + baseSalary);
+//        }
         int totalEarnings = baseSalary + otAmountFinal;
 
 
@@ -410,7 +445,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
     // ===== Helper: compute penalty given a rule, day salary & shift hours
     private int computePenalty(AttendancePenaltyRules rule, int daySalary, int totalHours) {
 //        if (totalHours == null || totalHours <= 0) totalHours = 8; // fallback
-        System.out.println("computePenalty: rule = " + rule.getDeductionType() + ", daySalary = " + daySalary + ", totalHours = " + totalHours);
         float perHourSalary = daySalary / (float) totalHours;
         perHourSalary = new BigDecimal(perHourSalary).setScale(2, RoundingMode.HALF_UP).floatValue();
         float perMinuteSalary = perHourSalary / 60f;

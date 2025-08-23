@@ -14,4 +14,9 @@ public interface HolidayTemplatesService {
     HolidayTemplatesDto updateHolidayTemplate(Integer id, HolidayTemplatesDto holidayTemplatesDto);
 
     void deleteHolidayTemplate(Integer id);
+
+    boolean assignEmployees(Integer templateId, List<Integer> employeeIds);
+
+    List<Integer> getAssignEmployees(Integer templateId);
+
 }

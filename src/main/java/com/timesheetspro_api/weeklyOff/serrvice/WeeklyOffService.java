@@ -12,4 +12,5 @@ public interface WeeklyOffService {
     WeeklyOffDto update(Integer id, WeeklyOffDto dto);
     void delete(Integer id);
     void assignDefaultWeeklyOff(Integer id);
+    List<Integer> getAssignedEmployees(Integer weeklyOffId);
 }

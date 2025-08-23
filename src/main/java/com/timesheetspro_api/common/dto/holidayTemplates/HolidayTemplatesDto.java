@@ -13,4 +13,5 @@ public class HolidayTemplatesDto {
     private Integer createdBy;
     private String createdByUserName;
     private List<HolidayTemplateDetailsDto> holidayTemplateDetailsList;
+    private List<Integer> assignedEmployeeIds;
 }

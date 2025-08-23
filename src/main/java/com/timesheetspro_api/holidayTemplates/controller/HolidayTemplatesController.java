@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -62,7 +63,25 @@ public class HolidayTemplatesController {
         Map<String, Object> resBody = new HashMap<>();
         try {
             this.holidayTemplatesService.deleteHolidayTemplate(id);
-            return new ApiResponse<>(HttpStatus.OK.value(), "Holiday template updated successfully", "");
+            return new ApiResponse<>(HttpStatus.OK.value(), "Holiday template deleted successfully", "");
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
+        }
+    }
+
+    @PostMapping("/assignEmployees")
+    public ApiResponse<?> assignEmployees(@RequestBody Map<String, Object> data) {
+        Map<String, Object> resBody = new HashMap<>();
+        try {
+            Integer id = (Integer) data.get("id");
+            List<Integer> employeeIds = (List<Integer>) data.get("employeeIds");
+
+            return new ApiResponse<>(
+                    HttpStatus.OK.value(),
+                    "Template assigned successfully",
+                    this.holidayTemplatesService.assignEmployees(id, employeeIds)
+            );
+
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
         }
