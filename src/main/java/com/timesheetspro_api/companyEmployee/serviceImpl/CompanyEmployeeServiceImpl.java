@@ -479,6 +479,20 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
     }
 
     @Override
+    public Long getLastUserId() {
+        try {
+            Long lastUserId = this.companyEmployeeRepository.getLastUserId();
+            if (lastUserId == null) {
+                return 0L;
+            }
+            return lastUserId;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
     public void deleteEmployee(int id) {
         try {
             CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(id).orElseThrow(() -> new RuntimeException("Employee not found"));
@@ -523,6 +537,8 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
 
             companyEmployee.setCompanyDetails(companyDetails);
             companyEmployee.setRoles(companyEmployeeRoles);
+            companyEmployee.setLateEntryPenaltyRule(true);
+            companyEmployee.setEarlyExitPenaltyRule(true);
             BeanUtils.copyProperties(employeeDto, companyEmployee);
             this.companyEmployeeRepository.save(companyEmployee);
             employeeDto.setEmployeeId(companyEmployee.getEmployeeId());
@@ -547,6 +563,8 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
 
             companyEmployee.setCompanyDetails(companyDetails);
             companyEmployee.setRoles(companyEmployeeRoles);
+            companyEmployee.setLateEntryPenaltyRule(true);
+            companyEmployee.setEarlyExitPenaltyRule(true);
             BeanUtils.copyProperties(employeeDto, companyEmployee);
             this.companyEmployeeRepository.save(companyEmployee);
             employeeDto.setEmployeeId(companyEmployee.getEmployeeId());

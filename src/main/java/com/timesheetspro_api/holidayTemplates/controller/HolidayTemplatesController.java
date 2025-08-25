@@ -75,11 +75,11 @@ public class HolidayTemplatesController {
         try {
             Integer id = (Integer) data.get("id");
             List<Integer> employeeIds = (List<Integer>) data.get("employeeIds");
-
+            List<Integer> removeEmployeeIds = (List<Integer>) data.get("removeEmployeeIds");
             return new ApiResponse<>(
                     HttpStatus.OK.value(),
                     "Template assigned successfully",
-                    this.holidayTemplatesService.assignEmployees(id, employeeIds)
+                    this.holidayTemplatesService.assignEmployees(id, employeeIds,removeEmployeeIds)
             );
 
         } catch (Exception e) {

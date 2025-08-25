@@ -47,7 +47,7 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
     private CompanyEmployeeRepository companyEmployeeRepository;
 
     @Override
-    public List<Map<String, Object>> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, List<String> month) {
+    public List<Map<String, Object>> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, List<String> month, Integer companyId) {
         try {
             boolean noFilters =
                     (employeeId == null || employeeId.isEmpty()) &&
@@ -60,6 +60,10 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
             }
 
             Specification<SalaryStatementHistory> spec = Specification.where(null);
+
+            if (companyId != null && companyId > 0) {
+                spec = spec.and(SalaryStatementHistorySpecification.hasCompany(companyId));
+            }
 
             if (employeeId != null && !employeeId.isEmpty()) {
                 spec = spec.and(SalaryStatementHistorySpecification.hasUserIds(employeeId));

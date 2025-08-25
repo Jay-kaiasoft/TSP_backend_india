@@ -10,7 +10,6 @@ import com.timesheetspro_api.weeklyOff.serrvice.WeeklyOffService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -27,7 +26,7 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
     private CompanyEmployeeRepository companyEmployeeRepository;
 
     @Override
-    public boolean assignEmployees(List<Integer> employeeIds, Integer weeklyOffId) {
+    public boolean assignEmployees(List<Integer> employeeIds, Integer weeklyOffId, List<Integer> removeEmployeeIds) {
         try {
             if (!employeeIds.isEmpty()) {
                 WeeklyOff weeklyOff = this.repository.findById(weeklyOffId)
@@ -38,10 +37,16 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
                     companyEmployee.setWeeklyOff(weeklyOff);
                     this.companyEmployeeRepository.save(companyEmployee);
                 }
-                return true;
-            } else {
-                throw new IllegalArgumentException("Employee ID cannot be null or empty");
             }
+            if (!removeEmployeeIds.isEmpty()) {
+                for (Integer employeeId : removeEmployeeIds) {
+                    CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(employeeId)
+                            .orElseThrow(() -> new IllegalArgumentException("Employee not found with ID: " + employeeId));
+                    companyEmployee.setWeeklyOff(null);
+                    this.companyEmployeeRepository.save(companyEmployee);
+                }
+            }
+            return true;
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e);
@@ -85,7 +90,7 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
             if (!hasAnyFlag(dto)) {
                 throw new IllegalArgumentException("At least one weekly off must be selected");
             }
-            WeeklyOff isExites = this.repository.existsByName(dto.getName());
+            WeeklyOff isExites = this.repository.existsByName(dto.getCompanyId(), dto.getName());
             if (isExites != null) {
                 throw new IllegalArgumentException("Template name already exists");
             }
@@ -94,8 +99,8 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
                     .orElseThrow(() -> new IllegalArgumentException("Company not found")));
             weeklyOff.setCompanyEmployee(companyEmployeeRepository.findById(dto.getCreatedBy())
                     .orElseThrow(() -> new IllegalArgumentException("Employee not found")));
-
-            BeanUtils.copyProperties(dto, weeklyOff, "id", "companyDetails", "companyEmployee");
+            weeklyOff.setIsDefault(0);
+            BeanUtils.copyProperties(dto, weeklyOff, "id", "companyDetails", "companyEmployee", "isDefault");
             this.repository.save(weeklyOff);
             return dto;
         } catch (Exception e) {
@@ -107,6 +112,10 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
     @Override
     public WeeklyOffDto update(Integer id, WeeklyOffDto dto) {
         try {
+            WeeklyOff isExites = this.repository.isExits(id, dto.getName());
+            if (isExites != null) {
+                throw new IllegalArgumentException("Template name already exists");
+            }
             if (!hasAnyFlag(dto)) {
                 throw new IllegalArgumentException("At least one weekly off must be selected");
             }
@@ -115,7 +124,7 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
                     .orElseThrow(() -> new IllegalArgumentException("Company not found")));
             weeklyOff.setCompanyEmployee(companyEmployeeRepository.findById(dto.getCreatedBy())
                     .orElseThrow(() -> new IllegalArgumentException("Employee not found")));
-            BeanUtils.copyProperties(dto, weeklyOff, "id");
+            BeanUtils.copyProperties(dto, weeklyOff, "id", "isDefault", "companyDetails", "companyEmployee");
             this.repository.save(weeklyOff);
             return dto;
         } catch (Exception e) {

@@ -9,8 +9,11 @@ import java.util.List;
 
 @Repository
 public interface WeeklyOffRepository extends JpaRepository<WeeklyOff, Integer> {
-    @Query("SELECT w FROM WeeklyOff w WHERE w.name=:name")
-    WeeklyOff existsByName(String name);
+    @Query("SELECT w FROM WeeklyOff w WHERE w.name=:name AND w.companyDetails.id=:id")
+    WeeklyOff existsByName(Integer id, String name);
+
+    @Query("SELECT w FROM WeeklyOff w WHERE w.name=:name AND w.id!=:id")
+    WeeklyOff isExits(Integer id, String name);
 
     @Query("SELECT w FROM WeeklyOff w WHERE w.companyDetails.id=:id")
     List<WeeklyOff> findByCompany(Integer id);

@@ -28,7 +28,7 @@ public class SalaryStatementHistoryController {
         Map<String, Object> resBody = new HashMap<>();
 
         try {
-            List<Map<String, Object>> salaryList = this.salaryStatementHistoryService.filterSalaryStatementHistory(employeeId,departmentId,month);
+            List<Map<String, Object>> salaryList = this.salaryStatementHistoryService.filterSalaryStatementHistory(employeeId, departmentId, month, Integer.parseInt(requestBody.get("companyId").toString()));
             return new ApiResponse<>(HttpStatus.OK.value(), "Fetch salary data successfully", salaryList);
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to fetch salary data", resBody);

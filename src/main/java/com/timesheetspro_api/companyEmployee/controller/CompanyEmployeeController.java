@@ -175,4 +175,14 @@ public class CompanyEmployeeController {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
         }
     }
+
+    @GetMapping("/getLastUserId")
+    public ApiResponse<?> getLastUserId() {
+        Map<String, Object> resBody = new HashMap<>();
+        try {
+            return new ApiResponse<>(HttpStatus.OK.value(), "Last user id fetch successfully", this.companyEmployeeService.getLastUserId());
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to fetch last user id fetch", resBody);
+        }
+    }
 }

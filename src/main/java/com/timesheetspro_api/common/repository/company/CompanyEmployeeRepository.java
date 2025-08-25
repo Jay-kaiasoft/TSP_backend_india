@@ -45,4 +45,8 @@ public interface CompanyEmployeeRepository extends JpaRepository<CompanyEmployee
 
     @Query("SELECT c FROM CompanyEmployee c WHERE c.overtimeRules.id=:id")
     List<CompanyEmployee> findByOTId(int id);
+
+    @Query("SELECT MAX(c.id) FROM CompanyEmployee c")
+    Long getLastUserId();
+
 }

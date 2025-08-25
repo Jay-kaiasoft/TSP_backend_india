@@ -62,13 +62,12 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             List<EmployeeSalaryStatementDto> salaryStatementList = new ArrayList<>();
             List<CompanyEmployee> companyEmployees;
             Specification<CompanyEmployee> spec = Specification.where(null);
-            spec.and(EmployeeStatementSpecification.hasCompanyId(salaryStatementRequestDto.getCompanyId()));
 
             boolean hasEmployeeFilter = salaryStatementRequestDto.getEmployeeIds() != null && !salaryStatementRequestDto.getEmployeeIds().isEmpty();
             boolean hasDepartmentFilter = salaryStatementRequestDto.getDepartmentIds() != null && !salaryStatementRequestDto.getDepartmentIds().isEmpty();
 
             if (!hasEmployeeFilter && !hasDepartmentFilter) {
-                companyEmployees = this.companyEmployeeRepository.findAll();
+                companyEmployees = this.companyEmployeeRepository.findByCompanyId(salaryStatementRequestDto.getCompanyId());
             } else {
 
                 if (hasEmployeeFilter) {
@@ -180,7 +179,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                     }
                 }
                 if (companyEmployee.getEarlyExitPenaltyRule()) {
-
                     if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
                         int earlyPenalty = calculateEarlyExitPenalty(companyEmployee, userInOut.getTimeOut());
                         penaltyAmount += earlyPenalty;
@@ -236,34 +234,33 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
         // Calculate canteen deductions
         int otherDeductions = calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays) + penaltyAmount;
-        int totalDeductions = pfAmount + ptAmount + otherDeductions + penaltyAmount;
+        int totalDeductions = pfAmount + ptAmount + otherDeductions;
 
         // Calculate earnings
         long dailySalary = companyEmployee.getBasicSalary() / 30;
         int baseSalary = (int) (dailySalary * (totalPaidDays + actualWorkDays.size()));
-//        if (companyEmployee.getEmployeeId() == 96) {
-//            System.out.println("================ dailySalary ===============" + dailySalary);
-//            System.out.println("=============== actualWorkDays.size() ============" + actualWorkDays.size());
-//            System.out.println("|============== totalPaidDays ============" + totalPaidDays);
-//            System.out.println("============== baseSalary ============" + baseSalary);
-//        }
         int totalEarnings = baseSalary + otAmountFinal;
 
 
-//        if (companyEmployee.getEmployeeId() == 94) {
-//            System.out.println("Debugging Employee Salary Statement for Employee ID: " + companyEmployee.getEmployeeId());
-//            System.out.println("Start Date: " + dateFormat.format(startDate));
-//            System.out.println("End Date: " + dateFormat.format(endDate));
-//            System.out.println("Paid Days: " + totalPaidDays);
-//            System.out.println("Worked Days: " + actualWorkDays.size());
-//            System.out.println("Total Worked Days: " + (actualWorkDays.size() + totalPaidDays));
-//            System.out.println("Total Worked Minutes: " + totalWorkedMinutes);
-//            System.out.println("Overtime Minutes: " + otFinalMinutes);
-//            System.out.println("Overtime Amount: " + otAmountFinal);
-//            System.out.println("Total Earnings: " + totalEarnings);
-//            System.out.println("Total Deductions: " + totalDeductions);
-//            System.out.println("Net Salary: " + (totalEarnings - totalDeductions));
-//        }
+//        System.out.println("============= Debugging Employee Salary Statement for Employee: ================" + companyEmployee.getUsername());
+//        System.out.println("Daily Salary: " + dailySalary);
+//        System.out.println("Basic Salary: " + baseSalary);
+//        System.out.println("Start Date: " + dateFormat.format(startDate));
+//        System.out.println("End Date: " + dateFormat.format(endDate));
+//        System.out.println("Paid Days: " + totalPaidDays);
+//        System.out.println("Worked Days: " + actualWorkDays.size());
+//        System.out.println("Total Worked Days: " + (actualWorkDays.size() + totalPaidDays));
+//        System.out.println("Total Worked Minutes: " + totalWorkedMinutes);
+//        System.out.println("Overtime Minutes: " + otFinalMinutes);
+//        System.out.println("Overtime Amount: " + otAmountFinal);
+//        System.out.println("Total Earnings: " + totalEarnings);
+//        System.out.println("PF Amount: " + pfAmount);
+//        System.out.println("PT Amount: " + ptAmount);
+//        System.out.println("Canteen Deductions: " + calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays));
+//        System.out.println("Penalty Amount: " + penaltyAmount);
+//        System.out.println("Other Deductions (Canteen + Penalty): " + otherDeductions);
+//        System.out.println("Total Deductions: " + totalDeductions);
+//        System.out.println("Net Salary: " + (totalEarnings - totalDeductions));
 
         // Set all calculated values
         dto.setOverTime(otFinalMinutes);

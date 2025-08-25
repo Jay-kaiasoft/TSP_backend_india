@@ -20,4 +20,9 @@ public class SalaryStatementHistorySpecification {
         return (root, query, cb) ->
                 root.get("monthYear").in(month);
     }
+
+    public static Specification<SalaryStatementHistory> hasCompany(Integer companyId) {
+        return (root, query, cb) ->
+                root.get("companyDetails").get("id").in(companyId);
+    }
 }

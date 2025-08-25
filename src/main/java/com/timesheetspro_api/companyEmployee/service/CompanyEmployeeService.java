@@ -33,4 +33,6 @@ public interface CompanyEmployeeService {
     String uploadEmployeeAadharImage(Integer companyId, Integer employeeId, String imagePath);
 
     boolean deleteEmployeeAadharImage(Integer companyId, Integer employeeId);
+
+    Long getLastUserId();
 }

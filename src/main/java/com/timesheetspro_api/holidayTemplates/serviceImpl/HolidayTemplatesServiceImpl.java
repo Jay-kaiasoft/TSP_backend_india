@@ -142,13 +142,20 @@ public class HolidayTemplatesServiceImpl implements HolidayTemplatesService {
     }
 
     @Override
-    public boolean assignEmployees(Integer templateId, List<Integer> employeeIds) {
+    public boolean assignEmployees(Integer templateId, List<Integer> employeeIds, List<Integer> removeEmployeeIds) {
         try {
             HolidayTemplates holidayTemplates = this.holidayTemplatesRepository.findById(templateId).orElseThrow(() -> new RuntimeException("Holiday Template not found"));
             for (Integer id : employeeIds) {
                 CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(id).orElseThrow(() -> new RuntimeException("Company Employee not found"));
                 companyEmployee.setHolidayTemplates(holidayTemplates);
                 this.companyEmployeeRepository.save(companyEmployee);
+            }
+            if (!removeEmployeeIds.isEmpty()) {
+                for (Integer id : removeEmployeeIds) {
+                    CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(id).orElseThrow(() -> new RuntimeException("Company Employee not found"));
+                    companyEmployee.setHolidayTemplates(null);
+                    this.companyEmployeeRepository.save(companyEmployee);
+                }
             }
             return true;
         } catch (Exception e) {

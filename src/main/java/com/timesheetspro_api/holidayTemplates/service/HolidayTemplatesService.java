@@ -15,7 +15,7 @@ public interface HolidayTemplatesService {
 
     void deleteHolidayTemplate(Integer id);
 
-    boolean assignEmployees(Integer templateId, List<Integer> employeeIds);
+    boolean assignEmployees(Integer templateId, List<Integer> employeeIds, List<Integer> removeEmployeeIds);
 
     List<Integer> getAssignEmployees(Integer templateId);
 

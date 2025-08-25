@@ -44,11 +44,11 @@ public class WeeklyOffController {
         try {
             Integer weekOffId = (Integer) data.get("weekOffId");
             List<Integer> employeeIds = (List<Integer>) data.get("employeeIds");
-
+            List<Integer> removeEmployeeIds = (List<Integer>) data.get("removeEmployeeIds");
             return new ApiResponse<>(
                     HttpStatus.OK.value(),
                     "Template assigned successfully",
-                    this.weeklyOffService.assignEmployees(employeeIds, weekOffId)
+                    this.weeklyOffService.assignEmployees(employeeIds, weekOffId,removeEmployeeIds)
             );
 
         } catch (Exception e) {
