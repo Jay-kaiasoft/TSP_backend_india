@@ -447,8 +447,6 @@ public class UserServiceImpl implements UserService {
 
             Users user = this.userRepository.findUserById(Long.parseLong(id));
             if (user == null) {
-                System.out.printf("========= companyNo ======" + companyNo);
-                System.out.printf("========= id ======" + id);
                 CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(Integer.parseInt(id)).orElseThrow(() -> new RuntimeException("User not found"));
                 if (companyEmployee == null) {
                     res.put("message", "User not found");
