@@ -31,7 +31,7 @@ public interface UserService extends UserDetailsService {
 
     Map<String, Object> resetPassword(ResetPasswordDto resetPasswordDto);
 
-    String uploadProfileImage(Long userId, String imagePath);
+    String uploadProfileImage(Integer userId, String imagePath);
 
-    boolean deleteProfileImage(Long userId);
+    boolean deleteProfileImage(Integer userId);
 }

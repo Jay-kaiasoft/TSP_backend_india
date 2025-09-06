@@ -30,19 +30,19 @@ public class CommonController {
     public ApiResponse<?> uploadFiles(
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
             @RequestParam String folderName,
-            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Integer userId,
             @RequestParam(required = false) MultipartFile[] files, // For multiple files
             @RequestParam(required = false) MultipartFile file // For a single file
     ) {
         Map<String, Object> resBody = new HashMap<>();
-        Long loginUserId = null;
+        Integer loginUserId = null;
         try {
 
             if (authorizationHeader != null) {
                 if (userId != null) {
                     loginUserId = userId;
                 } else {
-                    loginUserId = jwtUtil.extractUserId(authorizationHeader.substring(7));
+                    loginUserId = Integer.parseInt(jwtUtil.extractUserId(authorizationHeader.substring(7)).toString());
                 }
             }
             // Handle both single and multiple files

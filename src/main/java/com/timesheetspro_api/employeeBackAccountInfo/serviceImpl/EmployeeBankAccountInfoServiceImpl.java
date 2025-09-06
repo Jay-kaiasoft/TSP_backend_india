@@ -106,7 +106,7 @@ public class EmployeeBankAccountInfoServiceImpl implements EmployeeBankAccountIn
             this.deletePassbookImage(companyId, id);
             EmployeeBackAccountInfo existing = this.bankAccountInfoRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Bank account info not found"));
-            String updatedPath = this.commonService.updateFileLocationForProfile(imagePath, Long.parseLong(companyId.toString()), "employeeProfile/bank/" + id);
+            String updatedPath = this.commonService.updateFileLocationForProfile(imagePath, Integer.parseInt(companyId.toString()), "employeeProfile/bank/" + id);
             if (updatedPath.equals("Error")) {
                 return "Error";
             } else {

@@ -14,6 +14,4 @@ public class OvertimeRulesDto {
     private Integer companyId;
     private Integer createdBy;
     private String createdByUserName;
-    private Timestamp startTime;
-    private Timestamp endTime;
 }

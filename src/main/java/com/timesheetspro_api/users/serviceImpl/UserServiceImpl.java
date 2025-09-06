@@ -580,10 +580,10 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public String uploadProfileImage(Long userId, String imagePath) {
+    public String uploadProfileImage(Integer userId, String imagePath) {
         try {
             this.deleteProfileImage(userId);
-            Users user = this.userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+            Users user = this.userRepository.findById(Long.parseLong(userId.toString())).orElseThrow(() -> new RuntimeException("User not found"));
             String updatedPath = this.commonService.updateFileLocationForProfile(imagePath, userId, "profileImages");
             if (updatedPath.equals("Error")) {
                 return "Error";
@@ -599,9 +599,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public boolean deleteProfileImage(Long userId) {
+    public boolean deleteProfileImage(Integer userId) {
         try {
-            Users user = this.userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+            Users user = this.userRepository.findById(Long.parseLong(userId.toString())).orElseThrow(() -> new RuntimeException("User not found"));
             user.setProfileImage("");
             this.userRepository.save(user);
 

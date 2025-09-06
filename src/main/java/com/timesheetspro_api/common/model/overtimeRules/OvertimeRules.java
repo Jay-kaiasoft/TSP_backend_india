@@ -39,10 +39,4 @@ public class OvertimeRules {
 
     @Column(name = "ot_type")
     private String otType;
-
-    @Column(name = "start_time")
-    private Timestamp startTime;
-
-    @Column(name = "end_time")
-    private Timestamp endTime;
 }

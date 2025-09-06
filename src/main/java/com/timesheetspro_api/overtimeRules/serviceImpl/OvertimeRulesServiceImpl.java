@@ -72,8 +72,6 @@ public class OvertimeRulesServiceImpl implements OvertimeRulesService {
             overtimeRules.setOtMinutes(overtimeRulesDto.getOtMinutes());
             overtimeRules.setOtAmount(overtimeRulesDto.getOtAmount());
             overtimeRules.setOtType(overtimeRulesDto.getOtType());
-            overtimeRules.setStartTime(overtimeRulesDto.getStartTime());
-            overtimeRules.setEndTime(overtimeRulesDto.getEndTime());
             OvertimeRules savedOvertimeRules = this.overtimeRulesRepository.save(overtimeRules);
             OvertimeRulesDto savedOvertimeRulesDto = new OvertimeRulesDto();
             BeanUtils.copyProperties(savedOvertimeRules, savedOvertimeRulesDto);
@@ -101,8 +99,6 @@ public class OvertimeRulesServiceImpl implements OvertimeRulesService {
             overtimeRules.setOtMinutes(overtimeRulesDto.getOtMinutes());
             overtimeRules.setOtAmount(overtimeRulesDto.getOtAmount());
             overtimeRules.setOtType(overtimeRulesDto.getOtType());
-            overtimeRules.setStartTime(overtimeRulesDto.getStartTime());
-            overtimeRules.setEndTime(overtimeRulesDto.getEndTime());
             OvertimeRules savedOvertimeRules = this.overtimeRulesRepository.save(overtimeRules);
             OvertimeRulesDto savedOvertimeRulesDto = new OvertimeRulesDto();
             BeanUtils.copyProperties(savedOvertimeRules, savedOvertimeRulesDto);

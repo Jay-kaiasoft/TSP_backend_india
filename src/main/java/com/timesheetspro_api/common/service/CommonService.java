@@ -15,9 +15,9 @@ public interface CommonService {
 
     String convertDateToString(Date date);
 
-    Map<String, Object> uploadFiles(MultipartFile[] files, Long LoginUserId, String folderName);
+    Map<String, Object> uploadFiles(MultipartFile[] files, Integer LoginUserId, String folderName);
 
-    String updateFileLocationForProfile(String image, Long loginUserId, String folderName);
+    String updateFileLocationForProfile(String image, Integer loginUserId, String folderName);
 
     void deleteDirectoryRecursively(File directory);
 

@@ -411,7 +411,7 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
         try {
             this.deleteEmployeeProfile(companyId, employeeId);
             CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
-            String updatedPath = this.commonService.updateFileLocationForProfile(imagePath, Long.parseLong(companyId.toString()), "employeeProfile/" + employeeId);
+            String updatedPath = this.commonService.updateFileLocationForProfile(imagePath, Integer.parseInt(companyId.toString()), "employeeProfile/" + employeeId);
             if (updatedPath.equals("Error")) {
                 return "Error";
             } else {
@@ -447,7 +447,7 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
         try {
             this.deleteEmployeeProfile(companyId, employeeId);
             CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
-            String updatedPath = this.commonService.updateFileLocationForProfile(imagePath, Long.parseLong(companyId.toString()), "employeeProfile/aadharImage/" + employeeId);
+            String updatedPath = this.commonService.updateFileLocationForProfile(imagePath, Integer.parseInt(companyId.toString()), "employeeProfile/aadharImage/" + employeeId);
             if (updatedPath.equals("Error")) {
                 return "Error";
             } else {

@@ -124,7 +124,7 @@ public class CommonServiceImpl implements CommonService {
     }
 
     @Override
-    public Map<String, Object> uploadFiles(MultipartFile[] files, Long loginUserId, String folderName) {
+    public Map<String, Object> uploadFiles(MultipartFile[] files, Integer loginUserId, String folderName) {
         Map<String, Object> resBody = new HashMap<>();
         List<Map<String, String>> uploadedFiles = new ArrayList<>();
         try {
@@ -173,6 +173,7 @@ public class CommonServiceImpl implements CommonService {
             resBody.put("uploadedFiles", uploadedFiles);
             resBody.put("status", 200);
         } catch (Exception e) {
+            e.printStackTrace();
             resBody.put("status", "error");
             resBody.put("message", e.getMessage());
         }
@@ -181,7 +182,7 @@ public class CommonServiceImpl implements CommonService {
     }
 
     @Override
-    public String updateFileLocationForProfile(String image, Long loginUserId, String folderName) {
+    public String updateFileLocationForProfile(String image, Integer loginUserId, String folderName) {
         String[] arr = image.split("/");
         String originalFileName = arr[arr.length - 1];
 

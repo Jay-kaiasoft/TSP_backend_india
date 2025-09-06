@@ -324,7 +324,7 @@ public class CompanyDetailsServiceImpl implements CompanyDetailsService {
         try {
             this.deleteCompanyLogo(companyId);
             CompanyDetails companyDetails = this.companyDetailsRepository.findById(companyId).orElseThrow(() -> new RuntimeException("Company not found"));
-            String updatedPath = this.commonService.updateFileLocationForProfile(imagePath, Long.parseLong(companyId.toString()), "companyLogo");
+            String updatedPath = this.commonService.updateFileLocationForProfile(imagePath, Integer.parseInt(companyId.toString()), "companyLogo");
             if (updatedPath.equals("Error")) {
                 return "Error";
             } else {

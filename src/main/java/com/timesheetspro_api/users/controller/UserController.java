@@ -166,7 +166,7 @@ public class UserController {
 
         Map<String, Object> resBody = new HashMap<>();
         try {
-            Long userId = req.get("userId") != null ? Long.parseLong(req.get("userId").toString()) : jwtUtil.extractUserId(authorizationHeader.substring(7));
+            Integer userId = req.get("userId") != null ? Integer.parseInt(req.get("userId").toString()) : Integer.parseInt(jwtUtil.extractUserId(authorizationHeader.substring(7)).toString());
             String path = this.userService.uploadProfileImage(userId, req.get("profileImage").toString());
             if (path.equals("Error")) {
                 return new ApiResponse<>(HttpStatus.NOT_FOUND.value(), "Image does not exist in the directory", "");
@@ -182,7 +182,7 @@ public class UserController {
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
         Map<String, Object> resBody = new HashMap<>();
         try {
-            Long userId = jwtUtil.extractUserId(authorizationHeader.substring(7));
+            Integer userId = Integer.parseInt(jwtUtil.extractUserId(authorizationHeader.substring(7)).toString());
             if (this.userService.deleteProfileImage(userId)) {
                 return new ApiResponse<>(HttpStatus.OK.value(), "Profile image deleted successfully", "");
             }

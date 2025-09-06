@@ -11,8 +11,8 @@ public class AttendancePenaltyRulesDto {
     private Integer companyId;
     private Integer createdBy;
     private String createdByUserName;
-    private Timestamp startTime;
-    private Timestamp endTime;
+//    private Timestamp startTime;
+//    private Timestamp endTime;
     private Integer minutes;
     private String deductionType;
     private Integer amount;

@@ -31,12 +31,6 @@ public class AttendancePenaltyRules {
     @JoinColumn(name = "created_by", referencedColumnName = "id")
     private CompanyEmployee companyEmployee;
 
-    @Column(name = "start_time")
-    private Timestamp startTime;
-
-    @Column(name = "end_time")
-    private Timestamp endTime;
-
     @Column(name = "minutes")
     private Integer minutes;
 
