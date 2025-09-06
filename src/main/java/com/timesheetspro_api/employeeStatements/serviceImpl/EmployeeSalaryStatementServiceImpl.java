@@ -97,23 +97,23 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
     }
 
     private EmployeeSalaryStatementDto buildEmployeeSalaryStatement(CompanyEmployee companyEmployee, SalaryStatementRequestDto salaryStatementRequestDto) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+//        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+//        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
 
         // Date range handling
         java.util.Date startDate, endDate;
-        if (salaryStatementRequestDto.getStartDate() == null || salaryStatementRequestDto.getEndDate() == null) {
+        if (salaryStatementRequestDto.getStartDate() != null || salaryStatementRequestDto.getEndDate() != null) {
+            startDate = this.commonService.convertStringToDate(salaryStatementRequestDto.getStartDate());
+            endDate = this.commonService.convertStringToDate(salaryStatementRequestDto.getEndDate());
+        } else {
             Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
             calendar.set(Calendar.DAY_OF_MONTH, 1);
             startDate = calendar.getTime();
             calendar.add(Calendar.MONTH, 1);
             calendar.set(Calendar.DAY_OF_MONTH, 0);
             endDate = calendar.getTime();
-        } else {
-            startDate = this.commonService.convertLocalToUtc(salaryStatementRequestDto.getStartDate(), salaryStatementRequestDto.getTimeZone(), false);
-            endDate = this.commonService.convertLocalToUtc(salaryStatementRequestDto.getEndDate(), salaryStatementRequestDto.getTimeZone(), true);
-        }
 
+        }
         // Initialize DTO with basic employee info
         EmployeeSalaryStatementDto dto = new EmployeeSalaryStatementDto();
         dto.setEmployeeId(companyEmployee.getEmployeeId());
@@ -145,7 +145,9 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 .and(UserInOutSpecification.isSalaryGenerate());
 
         List<UserInOut> userInOutList = this.userInOutRepository.findAll(userSpec);
+        System.out.println("============== userInOutList Size: ==============" + userInOutList.size());
         if (userInOutList.isEmpty()) {
+            System.out.println("============== No attendance records found ==============");
             return null;
         }
 
@@ -237,30 +239,35 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         int totalDeductions = pfAmount + ptAmount + otherDeductions;
 
         // Calculate earnings
-        long dailySalary = companyEmployee.getBasicSalary() / 30;
+        long dailySalary = 0L;
+        if (companyEmployee.getEmployeeType().getId() == 2 && companyEmployee.getHourlyRate() != null) {
+            dailySalary = (long) (companyEmployee.getHourlyRate() * employeeShiftHours);
+        } else {
+            dailySalary = companyEmployee.getBasicSalary() / 30;
+        }
         int baseSalary = (int) (dailySalary * (totalPaidDays + actualWorkDays.size()));
         int totalEarnings = baseSalary + otAmountFinal;
 
 
-//        System.out.println("============= Debugging Employee Salary Statement for Employee: ================" + companyEmployee.getUsername());
-//        System.out.println("Daily Salary: " + dailySalary);
-//        System.out.println("Basic Salary: " + baseSalary);
-//        System.out.println("Start Date: " + dateFormat.format(startDate));
-//        System.out.println("End Date: " + dateFormat.format(endDate));
-//        System.out.println("Paid Days: " + totalPaidDays);
-//        System.out.println("Worked Days: " + actualWorkDays.size());
-//        System.out.println("Total Worked Days: " + (actualWorkDays.size() + totalPaidDays));
-//        System.out.println("Total Worked Minutes: " + totalWorkedMinutes);
-//        System.out.println("Overtime Minutes: " + otFinalMinutes);
-//        System.out.println("Overtime Amount: " + otAmountFinal);
-//        System.out.println("Total Earnings: " + totalEarnings);
-//        System.out.println("PF Amount: " + pfAmount);
-//        System.out.println("PT Amount: " + ptAmount);
-//        System.out.println("Canteen Deductions: " + calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays));
-//        System.out.println("Penalty Amount: " + penaltyAmount);
-//        System.out.println("Other Deductions (Canteen + Penalty): " + otherDeductions);
-//        System.out.println("Total Deductions: " + totalDeductions);
-//        System.out.println("Net Salary: " + (totalEarnings - totalDeductions));
+        System.out.println("============= Debugging Employee Salary Statement for Employee: ================" + companyEmployee.getUsername());
+        System.out.println("Daily Salary: " + dailySalary);
+        System.out.println("Basic Salary: " + baseSalary);
+        System.out.println("Start Date: " + startDate);
+        System.out.println("End Date: " + endDate);
+        System.out.println("Paid Days: " + totalPaidDays);
+        System.out.println("Worked Days: " + actualWorkDays.size());
+        System.out.println("Total Worked Days: " + (actualWorkDays.size() + totalPaidDays));
+        System.out.println("Total Worked Minutes: " + totalWorkedMinutes);
+        System.out.println("Overtime Minutes: " + otFinalMinutes);
+        System.out.println("Overtime Amount: " + otAmountFinal);
+        System.out.println("Total Earnings: " + totalEarnings);
+        System.out.println("PF Amount: " + pfAmount);
+        System.out.println("PT Amount: " + ptAmount);
+        System.out.println("Canteen Deductions: " + calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays));
+        System.out.println("Penalty Amount: " + penaltyAmount);
+        System.out.println("Other Deductions (Canteen + Penalty): " + otherDeductions);
+        System.out.println("Total Deductions: " + totalDeductions);
+        System.out.println("Net Salary: " + (totalEarnings - totalDeductions));
 
         // Set all calculated values
         dto.setOverTime(otFinalMinutes);
@@ -274,7 +281,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         dto.setTotalEarnings(totalEarnings);
         dto.setTotalDeductions(totalDeductions);
         dto.setNetSalary(totalEarnings - totalDeductions);
-
+        System.out.println("============== Final Salary Statement DTO: ==============" + dto);
         return dto;
     }
 

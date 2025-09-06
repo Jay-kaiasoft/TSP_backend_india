@@ -138,14 +138,13 @@ public class CommonServiceImpl implements CommonService {
                 boolean isImage = fileExtension.matches("jpg|jpeg|png");
 
                 if (!(isImage || isVideo)) {
-                    resBody.put("status", 400);
+                    resBody.put("status", "400");
                     resBody.put("message", "." + fileExtension + " File type not supported");
                     return resBody;
                 }
 
                 // Generate dynamic directory path
                 String dynamicPath = loginUserId + "/" + "tempImage/" + folderName + "/";
-
                 // Create directory if it doesn't exist
                 File targetDirectory = new File(FILE_DIRECTORY + dynamicPath);
                 if (!targetDirectory.exists()) {

@@ -23,6 +23,7 @@ public class EmployeeSalaryStatementController {
             List<EmployeeSalaryStatementDto> list = this.employeeSalaryStatementService.getEmployeeSalaryStatements(request);
             return new ApiResponse<>(HttpStatus.OK.value(), "Fetch statement successfully", list);
         } catch (Exception e) {
+            e.printStackTrace();
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to fetch statement", null);
         }
     }

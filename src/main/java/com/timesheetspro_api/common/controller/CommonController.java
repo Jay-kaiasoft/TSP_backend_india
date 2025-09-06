@@ -55,7 +55,7 @@ public class CommonController {
             }
             Map<String, Object> resBodyObjectMap = commonService.uploadFiles(files, loginUserId, folderName);
 
-            if ((int) resBodyObjectMap.get("status") == 400) {
+            if (resBodyObjectMap.get("status").equals("400")) {
                 return new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), resBodyObjectMap.get("message").toString(), "");
             }
             return new ApiResponse<>(
