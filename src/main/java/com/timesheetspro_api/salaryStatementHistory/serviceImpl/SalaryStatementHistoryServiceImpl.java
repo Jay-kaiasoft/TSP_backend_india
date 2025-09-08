@@ -127,8 +127,8 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
         try {
             for (SalaryStatementHistoryDto dto : salaryStatement) {
                 java.util.Date startDate, endDate;
-                startDate = this.commonService.convertLocalToUtc(dto.getStartDate(), dto.getTimeZone(), false);
-                endDate = this.commonService.convertLocalToUtc(dto.getEndDate(), dto.getTimeZone(), false);
+                startDate = this.commonService.convertStringToDate(dto.getStartDate());
+                endDate = this.commonService.convertStringToDate(dto.getEndDate());
 
                 Specification<UserInOut> userSpec = Specification.where(EmployeeStatementSpecification.hasUserIds(List.of(dto.getEmployeeId())));
                 userSpec = userSpec.and(EmployeeStatementSpecification.betweenCreatedOn(startDate, endDate));

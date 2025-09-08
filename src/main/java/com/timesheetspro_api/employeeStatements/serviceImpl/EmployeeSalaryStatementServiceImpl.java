@@ -33,6 +33,7 @@ import java.sql.Date;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Service(value = "EmployeeSalaryStatementService")
 public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStatementService {
@@ -145,9 +146,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 .and(UserInOutSpecification.isSalaryGenerate());
 
         List<UserInOut> userInOutList = this.userInOutRepository.findAll(userSpec);
-        System.out.println("============== userInOutList Size: ==============" + userInOutList.size());
         if (userInOutList.isEmpty()) {
-            System.out.println("============== No attendance records found ==============");
             return null;
         }
 
@@ -156,6 +155,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         Set<LocalDate> actualWorkDays = new HashSet<>();
         long totalWorkedMillis = 0;
         int penaltyAmount = 0;
+        long workedMinutes = 0L;
 
         for (UserInOut userInOut : userInOutList) {
             dto.setClockInOutId(userInOut.getId());
@@ -169,8 +169,9 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 Instant instant = new java.util.Date(timeIn.getTime()).toInstant();
                 LocalDate date = instant.atZone(ZoneId.systemDefault()).toLocalDate();
 
-                long workedMinutes = workedMillis / (1000 * 60);
-                dailyWorkedMinutes.merge(date, workedMinutes, Long::sum);
+                long workMinutes = workedMillis / (1000 * 60);
+                workedMinutes = workedMinutes + workMinutes;
+                dailyWorkedMinutes.merge(date, workMinutes, Long::sum);
                 actualWorkDays.add(date);
 
                 // Calculate penalty amount
@@ -216,7 +217,11 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         long employeeWorkedMinutes = totalWorkedMillis / (1000 * 60);
         long totalWorkedMinutes = employeeWorkedMinutes - (actualWorkDays.size() * companyEmployee.getLunchBreak());
         long shiftMinutes = employeeShiftHours * 60L;
-        long otMinutes = Math.max(totalWorkedMinutes - (actualWorkDays.size() * shiftMinutes), 0);
+//        System.out.println("============= Employee Shift Hours ============" + employeeShiftHours + " | Shift Minutes: " + shiftMinutes);
+//        System.out.println("============= Total Worked Minutes ============" + totalWorkedMinutes + " | Worked Minutes: " + employeeWorkedMinutes + " | Lunch Breaks Total: " + (actualWorkDays.size() * companyEmployee.getLunchBreak()));
+//        long otMinutes = Math.max(totalWorkedMinutes - (actualWorkDays.size() * shiftMinutes), 0);
+        long otMinutes = Math.max(totalWorkedMinutes - shiftMinutes, 0);
+//        System.out.println("============= otMinutes ================" + otMinutes);
         int otFinalMinutes = (int) otMinutes;
         int otAmountFinal = calculateOvertimeAmount(companyEmployee, otFinalMinutes);
 
@@ -241,7 +246,9 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         // Calculate earnings
         long dailySalary = 0L;
         if (companyEmployee.getEmployeeType().getId() == 2 && companyEmployee.getHourlyRate() != null) {
-            dailySalary = (long) (companyEmployee.getHourlyRate() * employeeShiftHours);
+            double workedHours = totalWorkedMinutes / 60.0;
+            long roundedHours = (long) Math.ceil(workedHours);
+            dailySalary = (long) (roundedHours * companyEmployee.getHourlyRate());
         } else {
             dailySalary = companyEmployee.getBasicSalary() / 30;
         }
@@ -250,8 +257,8 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
 
         System.out.println("============= Debugging Employee Salary Statement for Employee: ================" + companyEmployee.getUsername());
+        System.out.println("Basic Salary: " + companyEmployee.getBasicSalary());
         System.out.println("Daily Salary: " + dailySalary);
-        System.out.println("Basic Salary: " + baseSalary);
         System.out.println("Start Date: " + startDate);
         System.out.println("End Date: " + endDate);
         System.out.println("Paid Days: " + totalPaidDays);
@@ -281,7 +288,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         dto.setTotalEarnings(totalEarnings);
         dto.setTotalDeductions(totalDeductions);
         dto.setNetSalary(totalEarnings - totalDeductions);
-        System.out.println("============== Final Salary Statement DTO: ==============" + dto);
         return dto;
     }
 
@@ -377,25 +383,29 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         }
 
         OvertimeRules rule = employee.getOvertimeRules();
-        Float otPayPerSlab = rule.getOtAmount();
-        if (otPayPerSlab == null) return 0;
-        Integer dailySalary = employee.getBasicSalary() / 30;
+        Float otPayPerSlab = rule.getOtAmount() != null ? rule.getOtAmount() : 0f;
+        Integer dailySalary = 0;
 
-        switch (rule.getOtType()) {
-            case "Fixed Amount":
+        if (employee.getEmployeeType().getId() == 2 && employee.getHourlyRate() != null) {
+            dailySalary = (int) (employee.getCompanyShift().getTotalHours() * employee.getHourlyRate());
+        } else {
+            dailySalary = employee.getBasicSalary() / 30;
+        }
+        switch (rule.getOtType().trim().toLowerCase()) {
+            case "fixed amount":
                 return otPayPerSlab.intValue();
-            case "Fixed Amount Per Hour":
+            case "fixed amount per hour":
                 long otHours = (long) Math.ceil(otMinutes / 60.0);
                 return (int) (otHours * otPayPerSlab);
-            case "1x Salary":
+            case "1 day salary":
                 return dailySalary;
-            case "1.5x Salary":
+            case "1.5 day salary":
                 return (int) (dailySalary * 1.5);
-            case "2x Salary":
+            case "2 day salary":
                 return dailySalary * 2;
-            case "2.5x Salary":
+            case "2.5 day salary":
                 return (int) (dailySalary * 2.5);
-            case "3x Salary":
+            case "3 day salary":
                 return dailySalary * 3;
             default:
                 return 0;
@@ -423,13 +433,42 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
     }
 
     // Helper method to calculate canteen deductions
+//    private int calculateCanteenDeductions(CompanyEmployee employee, Map<LocalDate, Long> dailyWorkedMinutes, Set<LocalDate> workDays) {
+//        if ("Office Type".equals(employee.getCanteenType())) {
+//            return employee.getCanteenAmount();
+//        }
+//
+//        int heavyWorkingDays = 0;
+//        long threshold = (long) (employee.getWorkingHoursIncludeLunch() * 60);
+//        for (LocalDate date : workDays) {
+//            if (dailyWorkedMinutes.getOrDefault(date, 0L) > threshold) {
+//                heavyWorkingDays++;
+//            }
+//        }
+//
+//        int lightDays = workDays.size() - heavyWorkingDays;
+//        int perDayAmount = employee.getCanteenAmount();
+//        return (lightDays * perDayAmount * 2) + (heavyWorkingDays * perDayAmount);
+//    }
+
+    // Helper method to calculate canteen deductions
     private int calculateCanteenDeductions(CompanyEmployee employee, Map<LocalDate, Long> dailyWorkedMinutes, Set<LocalDate> workDays) {
+        // Case 1: Office Type → flat amount
         if ("Office Type".equals(employee.getCanteenType())) {
             return employee.getCanteenAmount();
         }
 
-        int heavyWorkingDays = 0;
+        int perDayAmount = employee.getCanteenAmount();
+
+        // Case 2: If workingHoursIncludeLunch is null → always 2x per day
+        if (employee.getWorkingHoursIncludeLunch() == null) {
+            return workDays.size() * perDayAmount * 2;
+        }
+
+        // Case 3: Use threshold to decide heavy vs light day
         long threshold = (long) (employee.getWorkingHoursIncludeLunch() * 60);
+
+        int heavyWorkingDays = 0;
         for (LocalDate date : workDays) {
             if (dailyWorkedMinutes.getOrDefault(date, 0L) > threshold) {
                 heavyWorkingDays++;
@@ -437,14 +476,9 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         }
 
         int lightDays = workDays.size() - heavyWorkingDays;
-        int perDayAmount = employee.getCanteenAmount();
-//        if (heavyWorkingDays > 0){
-//            System.out.println("============= Canteen Amount ============"+(lightDays * perDayAmount * 2) + (heavyWorkingDays * perDayAmount));
-//        } else {
-//            System.out.println("============= Canteen Amount ============"+(lightDays * perDayAmount * 2));
-//        }
         return (lightDays * perDayAmount * 2) + (heavyWorkingDays * perDayAmount);
     }
+
 
     // ===== Helper: compute penalty given a rule, day salary & shift hours
     private int computePenalty(AttendancePenaltyRules rule, int daySalary, int totalHours) {
@@ -461,11 +495,11 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             case "30 Min Salary" -> (int) Math.round(perMinuteSalary * 30);
             case "1 Hour Salary" -> (int) Math.round(perHourSalary);
             case "Half Day Salary" -> daySalary / 2;
-            case "1 day Salary" -> daySalary;
-            case "1.5 day Salary" -> (int) Math.round(daySalary * 1.5);
-            case "2 day Salary" -> daySalary * 2;
-            case "2.5 day Salary" -> (int) Math.round(daySalary * 2.5);
-            case "3 day Salary" -> daySalary * 3;
+            case "1 Day Salary" -> daySalary;
+            case "1.5 Day Salary" -> (int) Math.round(daySalary * 1.5);
+            case "2 Day Salary" -> daySalary * 2;
+            case "2.5 Day Salary" -> (int) Math.round(daySalary * 2.5);
+            case "3 Day Salary" -> daySalary * 3;
             default -> 0;
         };
     }

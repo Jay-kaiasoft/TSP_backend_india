@@ -499,13 +499,16 @@ public class UserInOutServiceImpl implements UserInOutService {
     @Override
     public String clickInOut(int userId, Integer locationId, Integer companyId) {
         try {
+            CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Employee not found"));
+
             UserInOut isExisting = this.userInOutRepository.getCurrentUserRecord(userId);
             if (isExisting != null) {
                 this.updateUserInOut(isExisting.getId(), userId);
-                return "updated";
+                return "updated:" + companyEmployee.getUsername();
             } else {
                 this.createUserInOut(userId, locationId, companyId);
-                return "created";
+                return "created:" + companyEmployee.getUsername();
             }
         } catch (Exception e) {
             e.printStackTrace();

@@ -212,16 +212,20 @@ public class UserInOutController {
                     : null;
 
             String res = this.userInOutService.clickInOut(Integer.parseInt(employeeId), parsedLocationId, Integer.parseInt(companyId));
-            if (res.equals("created")) {
+            String[] parts = res.split(":", 2);
+            String status = parts[0];      // "created" or "updated"
+            String username = parts.length > 1 ? parts[1] : "";
+
+            if ("created".equals(status)) {
                 return new ApiResponse<>(
                         HttpStatus.CREATED.value(),
-                        "Clock In successfully",
+                        username+" clock in successfully",
                         ""
                 );
             } else {
                 return new ApiResponse<>(
                         HttpStatus.OK.value(),
-                        "Clock Out successfully",
+                        username+" clock out successfully",
                         ""
                 );
             }
