@@ -152,7 +152,7 @@ public class CompanyDetailsServiceImpl implements CompanyDetailsService {
                     locationDto.setCity(locations.getCity());
                     locationDto.setState(locations.getState());
                     locationDto.setCountry(locations.getCountry());
-                    locationDto.setTimeZone(locations.getTimeZone());
+//                    locationDto.setTimeZone(locations.getTimeZone());
                     locationDto.setAddress1(locations.getAddress1());
                     locationDto.setAddress2(locations.getAddress2());
                     locationDto.setEmployeeCount(locations.getEmployeeCount());

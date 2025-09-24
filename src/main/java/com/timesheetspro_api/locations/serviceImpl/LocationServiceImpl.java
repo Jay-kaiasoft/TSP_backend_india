@@ -1,7 +1,6 @@
 package com.timesheetspro_api.locations.serviceImpl;
 
 import com.timesheetspro_api.common.dto.location.LocationDto;
-import com.timesheetspro_api.common.exception.GlobalException;
 import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
 import com.timesheetspro_api.common.model.locations.Locations;
 import com.timesheetspro_api.common.repository.company.CompanyDetailsRepository;
@@ -141,7 +140,8 @@ public class LocationServiceImpl implements LocationService {
                 locations.setPayPeriodEnd(this.commonService.convertStringToDate(locationDto.getPayPeriodEnd()));
             }
             BeanUtils.copyProperties(locationDto, locations);
-            if (isNotEmpty(locationDto.getTimeZone()) &&
+            //isNotEmpty(locationDto.getTimeZone()) &&
+            if (
                     isNotEmpty(locationDto.getLocationName()) &&
                     isNotEmpty(locationDto.getCity()) &&
                     isNotEmpty(locationDto.getCountry()) &&
@@ -171,7 +171,7 @@ public class LocationServiceImpl implements LocationService {
             if (companyDetails != null) {
                 locations.setCompanyDetails(companyDetails);
             }
-            locations.setTimeZone(locationDto.getTimeZone());
+//            locations.setTimeZone(locationDto.getTimeZone());
             locations.setCity(locationDto.getCity());
             locations.setState(locationDto.getState());
             locations.setCountry(locationDto.getCountry());
@@ -189,7 +189,8 @@ public class LocationServiceImpl implements LocationService {
             if (locationDto.getPayPeriodEnd() != null){
                 locations.setPayPeriodEnd(this.commonService.convertStringToDate(locationDto.getPayPeriodEnd()));
             }
-            if (isNotEmpty(locationDto.getTimeZone()) &&
+            //isNotEmpty(locationDto.getTimeZone()) &&
+            if (
                     isNotEmpty(locationDto.getLocationName()) &&
                     isNotEmpty(locationDto.getCity()) &&
                     isNotEmpty(locationDto.getCountry()) &&

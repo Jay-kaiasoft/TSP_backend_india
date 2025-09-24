@@ -11,8 +11,8 @@ public class LocationDto {
     private int id;
     @NotBlank(message = "Location name is required")
     private String locationName;
-    @NotBlank(message = "TimeZone is required")
-    private String timeZone;
+//    @NotBlank(message = "TimeZone is required")
+//    private String timeZone;
     @NotBlank(message = "City is required")
     private String city;
     @NotBlank(message = "State is required")
@@ -29,7 +29,7 @@ public class LocationDto {
     private String externalId;
     private String geofenceId;
     private Integer isActive;
-    @NotNull(message = "Pay period is required")
+//    @NotNull(message = "Pay period is required")
     private Integer payPeriod;
     private String payPeriodStart;
     private String payPeriodEnd;

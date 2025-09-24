@@ -22,8 +22,8 @@ public class Locations {
     @Column(name = "location_name")
     private String locationName;
 
-    @Column(name = "time_zone")
-    private String TimeZone;
+//    @Column(name = "time_zone")
+//    private String TimeZone;
 
     @Column(name = "city")
     private String City;
