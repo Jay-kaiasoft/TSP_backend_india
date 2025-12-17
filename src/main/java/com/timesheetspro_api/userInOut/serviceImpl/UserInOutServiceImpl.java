@@ -139,6 +139,8 @@ public class UserInOutServiceImpl implements UserInOutService {
                         dto.setId(userInOut.getId());
                         dto.setUserName(userInOut.getUser().getUsername());
                         dto.setHourlyRate(userInOut.getUser().getHourlyRate());
+                        dto.setFirstName(userInOut.getUser().getFirstName());
+                        dto.setLastName(userInOut.getUser().getLastName());
                         dto.setCreatedOn(this.commonService.convertDateToString(userInOut.getCreatedOn()));
                         dto.setTimeIn(this.commonService.convertDateToString(userInOut.getTimeIn()));
                         if (userInOut.getTimeOut() != null) {

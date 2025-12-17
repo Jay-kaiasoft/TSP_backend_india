@@ -14,6 +14,8 @@ public class UserInOutDto {
     private int userId;
     private Float hourlyRate;
     private String userName;
+    private String firstName;
+    private String lastName;
     private String createdOn;
     private int locationId;
     private Integer companyId;

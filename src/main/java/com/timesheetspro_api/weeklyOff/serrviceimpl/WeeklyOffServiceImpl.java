@@ -72,11 +72,15 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
         try {
             WeeklyOffDto dto = new WeeklyOffDto();
             WeeklyOff weeklyOff = this.repository.findById(id).orElseThrow(() -> new IllegalArgumentException("Weekly off not found"));
-            BeanUtils.copyProperties(weeklyOff, dto);
-            dto.setCompanyId(weeklyOff.getCompanyDetails().getId());
-            dto.setCreatedBy(weeklyOff.getCompanyEmployee().getEmployeeId());
-            dto.setCreatedByUsername(weeklyOff.getCompanyEmployee().getUsername());
+
             dto.setAssignedEmployeeIds(this.getAssignedEmployees(id));
+            if (weeklyOff.getCompanyDetails() != null) {
+                dto.setCompanyId(weeklyOff.getCompanyDetails().getId());
+            }
+            if (weeklyOff.getCompanyEmployee() != null) {
+                dto.setCreatedBy(weeklyOff.getCompanyEmployee().getEmployeeId());
+                dto.setCreatedByUsername(weeklyOff.getCompanyEmployee().getUsername());
+            }
             BeanUtils.copyProperties(weeklyOff, dto);
             return dto;
         } catch (Exception e) {

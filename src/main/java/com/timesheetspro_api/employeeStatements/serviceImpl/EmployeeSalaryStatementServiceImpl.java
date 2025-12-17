@@ -3,7 +3,6 @@ package com.timesheetspro_api.employeeStatements.serviceImpl;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
 import java.time.*;
 
 import com.timesheetspro_api.common.dto.employeeStatement.EmployeeSalaryStatementDto;
@@ -13,7 +12,6 @@ import com.timesheetspro_api.common.dto.holidayTemplates.HolidayTemplatesDto;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.UserInOut.UserInOut;
 import com.timesheetspro_api.common.model.attendancePenaltyRules.AttendancePenaltyRules;
-import com.timesheetspro_api.common.model.holidayTemplateDetails.HolidayTemplateDetails;
 import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
 import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
 import com.timesheetspro_api.common.repository.OvertimeRulesRepository;
@@ -33,7 +31,6 @@ import java.sql.Date;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 @Service(value = "EmployeeSalaryStatementService")
 public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStatementService {
@@ -119,7 +116,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         EmployeeSalaryStatementDto dto = new EmployeeSalaryStatementDto();
         dto.setEmployeeId(companyEmployee.getEmployeeId());
         dto.setCompanyId(companyEmployee.getCompanyDetails().getId());
-        dto.setEmployeeName(companyEmployee.getUsername());
+        dto.setEmployeeName(companyEmployee.getFirstName() + " " + companyEmployee.getLastName());
 
         if (companyEmployee.getBasicSalary() != null) {
             dto.setBasicSalary(companyEmployee.getBasicSalary());
@@ -135,8 +132,9 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         // Calculate all working days for the period (including paid weekly-offs)
         int totalPaidDays = 0;
         if (workingDayConfig != null) {
-            Set<LocalDate> allPaidDays = calculatePaidDays(startDate, endDate, workingDayConfig);
-            totalPaidDays = totalPaidDays + allPaidDays.size();
+            Set<LocalDate> allPaidDays = new HashSet<>();
+            allPaidDays = calculatePaidDays(startDate, endDate, workingDayConfig);
+            totalPaidDays = allPaidDays.size();
         }
 
         // Get actual attendance data
@@ -198,12 +196,20 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy, hh:mm:ss a", Locale.ENGLISH);
 
+                // Convert the requested range to LocalDate for comparison
+                LocalDate rangeStart = startDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                LocalDate rangeEnd = endDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+
                 for (HolidayTemplateDetailsDto detail : holidayTemplate.getHolidayTemplateDetailsList()) {
-                    String dateStr = detail.getDate(); // "08/09/2025, 12:00:00 AM"
+                    String dateStr = detail.getDate();
                     if (dateStr != null && !dateStr.isBlank()) {
                         try {
-                            LocalDate date = LocalDate.parse(dateStr, formatter);
-                            actualWorkDays.add(date);
+                            LocalDate holidayDate = LocalDate.parse(dateStr, formatter);
+
+                            // NEW CHECK: Only add if the holiday is within the requested filter range
+                            if (!holidayDate.isBefore(rangeStart) && !holidayDate.isAfter(rangeEnd)) {
+                                actualWorkDays.add(holidayDate);
+                            }
                         } catch (DateTimeParseException e) {
                             throw new RuntimeException("Invalid date in holiday template: " + dateStr, e);
                         }
@@ -299,7 +305,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
         LocalDate start = startInstant.atZone(ZoneId.systemDefault()).toLocalDate();
         LocalDate end = endInstant.atZone(ZoneId.systemDefault()).toLocalDate();
-
         for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
             DayOfWeek dayOfWeek = date.getDayOfWeek();
             int dayOfMonth = date.getDayOfMonth();
@@ -367,7 +372,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                         break;
                 }
             }
-
             if (isWorkingDay) {
                 paidDays.add(date);
             }
@@ -433,52 +437,34 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
     }
 
     // Helper method to calculate canteen deductions
-//    private int calculateCanteenDeductions(CompanyEmployee employee, Map<LocalDate, Long> dailyWorkedMinutes, Set<LocalDate> workDays) {
-//        if ("Office Type".equals(employee.getCanteenType())) {
-//            return employee.getCanteenAmount();
-//        }
-//
-//        int heavyWorkingDays = 0;
-//        long threshold = (long) (employee.getWorkingHoursIncludeLunch() * 60);
-//        for (LocalDate date : workDays) {
-//            if (dailyWorkedMinutes.getOrDefault(date, 0L) > threshold) {
-//                heavyWorkingDays++;
-//            }
-//        }
-//
-//        int lightDays = workDays.size() - heavyWorkingDays;
-//        int perDayAmount = employee.getCanteenAmount();
-//        return (lightDays * perDayAmount * 2) + (heavyWorkingDays * perDayAmount);
-//    }
-
-    // Helper method to calculate canteen deductions
     private int calculateCanteenDeductions(CompanyEmployee employee, Map<LocalDate, Long> dailyWorkedMinutes, Set<LocalDate> workDays) {
         // Case 1: Office Type → flat amount
         if ("Office Type".equals(employee.getCanteenType())) {
             return employee.getCanteenAmount();
-        }
+        } else if ("Labour Type".equals(employee.getCanteenType())) {
+            int perDayAmount = employee.getCanteenAmount();
 
-        int perDayAmount = employee.getCanteenAmount();
-
-        // Case 2: If workingHoursIncludeLunch is null → always 2x per day
-        if (employee.getWorkingHoursIncludeLunch() == null) {
-            return workDays.size() * perDayAmount * 2;
-        }
-
-        // Case 3: Use threshold to decide heavy vs light day
-        long threshold = (long) (employee.getWorkingHoursIncludeLunch() * 60);
-
-        int heavyWorkingDays = 0;
-        for (LocalDate date : workDays) {
-            if (dailyWorkedMinutes.getOrDefault(date, 0L) > threshold) {
-                heavyWorkingDays++;
+            // Case 2: If workingHoursIncludeLunch is null → always 2x per day
+            if (employee.getWorkingHoursIncludeLunch() == null) {
+                return workDays.size() * perDayAmount * 2;
             }
+
+            // Case 3: Use threshold to decide heavy vs light day
+            long threshold = (long) hhDotMmToMinutes(employee.getWorkingHoursIncludeLunch());
+
+            int heavyWorkingDays = 0;
+            for (LocalDate date : workDays) {
+                if (dailyWorkedMinutes.getOrDefault(date, 0L) > threshold) {
+                    heavyWorkingDays++;
+                }
+            }
+
+            int lightDays = workDays.size() - heavyWorkingDays;
+            return (lightDays * perDayAmount * 2) + (heavyWorkingDays * perDayAmount);
+        } else {
+            return 0;
         }
-
-        int lightDays = workDays.size() - heavyWorkingDays;
-        return (lightDays * perDayAmount * 2) + (heavyWorkingDays * perDayAmount);
     }
-
 
     // ===== Helper: compute penalty given a rule, day salary & shift hours
     private int computePenalty(AttendancePenaltyRules rule, int daySalary, int totalHours) {
@@ -573,6 +559,20 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         if (chosenRule == null) return 0;
 
         return computePenalty(chosenRule, daySalary, totalHours);
+    }
+
+    private int hhDotMmToMinutes(Object value) {
+        if (value == null) return 0;
+
+        double val = Double.parseDouble(value.toString());
+        int hours = (int) val;
+        // Get the decimal part, round to 2 decimal places to avoid floating point errors
+        int minutes = (int) Math.round((val - hours) * 100);
+
+        if (minutes < 0 || minutes > 59) {
+            throw new IllegalArgumentException("Invalid minutes: " + minutes);
+        }
+        return (hours * 60) + minutes;
     }
 
 }

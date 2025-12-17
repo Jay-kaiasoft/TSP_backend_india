@@ -97,7 +97,7 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
             Long totalDays = 0L;
 
             for (Date[] range : dateRanges) {
-                dateSpec = dateSpec.or(EmployeeStatementSpecification.betweenCreatedOn(range[0], range[1]));
+                dateSpec = dateSpec.and(EmployeeStatementSpecification.betweenCreatedOn(range[0], range[1]));
 
                 LocalDate start = range[0].toLocalDate();
                 LocalDate end = range[1].toLocalDate();
@@ -202,7 +202,7 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                     Map<String, Object> res = new HashMap<>();
                     CompanyEmployeeDto companyEmployeeDto = this.getEmployee(companyEmployee.getEmployeeId());
                     res.put("employeeId", companyEmployeeDto.getEmployeeId());
-                    res.put("userName", companyEmployeeDto.getUserName());
+                    res.put("userName", companyEmployeeDto.getFirstName() + " " + companyEmployeeDto.getLastName());
                     response.add(res);
                 }
             }
@@ -271,7 +271,7 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 companyEmployeeDto.setWeeklyOffId(companyEmployee.getWeeklyOff().getId());
             }
 
-            if (companyEmployee.getHolidayTemplates() != null){
+            if (companyEmployee.getHolidayTemplates() != null) {
                 companyEmployeeDto.setHolidayTemplateId(companyEmployee.getHolidayTemplates().getId());
             }
 
@@ -328,7 +328,7 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 WeeklyOff weeklyOff = this.weeklyOffRepository.findDefault();
                 companyEmployee.setWeeklyOff(weeklyOff);
             }
-            if (companyEmployeeDto.getHolidayTemplateId() != null){
+            if (companyEmployeeDto.getHolidayTemplateId() != null) {
                 HolidayTemplates holidayTemplates = this.holidayTemplatesRepository.findById(companyEmployeeDto.getHolidayTemplateId()).orElseThrow(() -> new RuntimeException("Holiday template not found"));
                 companyEmployee.setHolidayTemplates(holidayTemplates);
             }
@@ -386,7 +386,7 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 WeeklyOff weeklyOff = this.weeklyOffRepository.findDefault();
                 companyEmployee.setWeeklyOff(weeklyOff);
             }
-            if (companyEmployeeDto.getHolidayTemplateId() != null){
+            if (companyEmployeeDto.getHolidayTemplateId() != null) {
                 HolidayTemplates holidayTemplates = this.holidayTemplatesRepository.findById(companyEmployeeDto.getHolidayTemplateId()).orElseThrow(() -> new RuntimeException("Holiday template not found"));
                 companyEmployee.setHolidayTemplates(holidayTemplates);
             }

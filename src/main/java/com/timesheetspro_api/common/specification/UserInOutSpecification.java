@@ -32,11 +32,11 @@ public class UserInOutSpecification {
     public static Specification<UserInOut> hasDepartmentIds(List<Integer> departmentIds) {
         return (root, query, criteriaBuilder) -> root.get("user").get("department").get("id").in(departmentIds);
     }
-    public static Specification<UserInOut> hasCompany(Integer companyId) {
-        return (root, query, criteriaBuilder) ->
-                criteriaBuilder.greaterThanOrEqualTo(root.get("companyDetails").get("id"), companyId);
-    }
 
+    public static Specification<UserInOut> hasCompany(int companyId) {
+        return (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(root.get("companyDetails").get("id"), companyId);
+    }
 
     public static Specification<UserInOut> isSalaryGenerate() {
         return (root, query, cb) ->

@@ -20,7 +20,6 @@ public class CompanyEmployeeDto {
     private String firstName;
     @NotNull(message = "Lastname is required")
     private String lastName;
-    @NotNull(message = "Email is required")
     private String email;
     @NotNull(message = "Password is required")
     private String password;
@@ -78,7 +77,7 @@ public class CompanyEmployeeDto {
     private Integer canteenAmount;
     private Integer otId;
     private Integer lunchBreak;
-    private Integer workingHoursIncludeLunch;
+    private Float workingHoursIncludeLunch;
     private Integer weeklyOffId;
     private Integer holidayTemplateId;
     private Boolean earlyExitPenaltyRule;

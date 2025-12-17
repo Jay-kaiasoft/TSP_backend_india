@@ -20,7 +20,6 @@ public class EmployeeDto {
     private String firstName;
     @NotNull(message = "Lastname is required")
     private String lastName;
-    @NotNull(message = "Email is required")
     private String email;
     @NotNull(message = "Password is required")
     private String password;
