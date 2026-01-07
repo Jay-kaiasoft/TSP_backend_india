@@ -55,8 +55,10 @@ public class HolidayTemplatesServiceImpl implements HolidayTemplatesService {
             holidayTemplatesDto.setId(holidayTemplates.getId());
             holidayTemplatesDto.setName(holidayTemplates.getName());
             holidayTemplatesDto.setCompanyId(holidayTemplates.getCompanyDetails().getId());
-            holidayTemplatesDto.setCreatedBy(holidayTemplates.getCompanyEmployee().getEmployeeId());
-            holidayTemplatesDto.setCreatedByUserName(holidayTemplates.getCompanyEmployee().getUsername());
+            if (holidayTemplates.getCompanyEmployee() !=null){
+                holidayTemplatesDto.setCreatedBy(holidayTemplates.getCompanyEmployee().getEmployeeId());
+                holidayTemplatesDto.setCreatedByUserName(holidayTemplates.getCompanyEmployee().getUsername());
+            }
             List<HolidayTemplateDetailsDto> holidayTemplateDetailsDtoList = this.holidayTemplateDetailsService.getAllHolidayTemplateDetailsByTemplateId(id);
             if (!holidayTemplateDetailsDtoList.isEmpty()) {
                 holidayTemplatesDto.setHolidayTemplateDetailsList(holidayTemplateDetailsDtoList);
@@ -78,6 +80,7 @@ public class HolidayTemplatesServiceImpl implements HolidayTemplatesService {
             holidayTemplates.setCompanyDetails(companyDetails);
             CompanyEmployee companyEmployee = companyEmployeeRepository.findById(holidayTemplatesDto.getCreatedBy())
                     .orElseThrow(() -> new RuntimeException("Company Employee not found"));
+
             holidayTemplates.setCompanyEmployee(companyEmployee);
             holidayTemplates.setName(holidayTemplatesDto.getName());
             HolidayTemplates newHolidayTemplates = this.holidayTemplatesRepository.save(holidayTemplates);

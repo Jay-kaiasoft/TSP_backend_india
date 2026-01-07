@@ -75,6 +75,7 @@ public class AttendancePenaltyRulesServiceImpl implements AttendancePenaltyRules
             if (existingRuleWithMinutes != null) {
                 throw new RuntimeException("Penalty rule already exists for " + attendancePenaltyRulesDto.getMinutes() + " minutes");
             }
+
             AttendancePenaltyRules attendancePenaltyRules = new AttendancePenaltyRules();
             CompanyDetails companyDetails = companyDetailsRepository.findById(attendancePenaltyRulesDto.getCompanyId())
                     .orElseThrow(() -> new RuntimeException("Company not found"));

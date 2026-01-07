@@ -58,70 +58,93 @@ public class CommonServiceImpl implements CommonService {
         try {
             SimpleDateFormat formatter;
 
-            // Determine format dynamically
-            if (dateStr.matches("\\d{2}/\\d{2}/\\d{4}")) { // Matches "MM/dd/yyyy"
-                formatter = new SimpleDateFormat("MM/dd/yyyy", Locale.ENGLISH);
-            } else if (dateStr.matches("\\d{4}-\\d{2}-\\d{2}")) { // Matches "yyyy-MM-dd"
+            // Determine format dynamically (DD/MM/YYYY)
+            if (dateStr.matches("\\d{2}/\\d{2}/\\d{4}")) {
+                // dd/MM/yyyy
+                formatter = new SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH);
+
+            } else if (dateStr.matches("\\d{4}-\\d{2}-\\d{2}")) {
+                // yyyy-MM-dd (ISO format)
                 formatter = new SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH);
+
             } else {
-                formatter = new SimpleDateFormat("MM/dd/yyyy, hh:mm:ss a", Locale.ENGLISH);
+                // dd/MM/yyyy, hh:mm:ss a
+                formatter = new SimpleDateFormat("dd/MM/yyyy, hh:mm:ss a", Locale.ENGLISH);
             }
 
-            formatter.setTimeZone(TimeZone.getTimeZone("UTC")); // Convert input to UTC
+            formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
             formatter.setLenient(false);
             return formatter.parse(dateStr);
+
         } catch (ParseException e) {
-            throw new RuntimeException("Error converting date: " + dateStr + " - " + e.getMessage());
+            throw new RuntimeException(
+                    "Error converting date: " + dateStr + " - " + e.getMessage()
+            );
         }
     }
+
 
     @Override
     public String convertUtcToLocal(String utcTime, String timeZone) {
         try {
-            // Ensure input format matches exactly
-            DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("MM/dd/yyyy, hh:mm:ss a", Locale.ENGLISH);
+            // Input format: dd/MM/yyyy, hh:mm:ss a
+            DateTimeFormatter inputFormatter =
+                    DateTimeFormatter.ofPattern("dd/MM/yyyy, hh:mm:ss a", Locale.ENGLISH);
 
-            // Parse the UTC time correctly
             LocalDateTime localDateTime = LocalDateTime.parse(utcTime, inputFormatter);
 
-            // Convert to UTC ZonedDateTime
-            ZonedDateTime utcZonedDateTime = localDateTime.atZone(ZoneId.of("UTC"));
+            ZonedDateTime utcZonedDateTime =
+                    localDateTime.atZone(ZoneId.of("UTC"));
 
-            // Convert to target time zone
-            ZonedDateTime localZonedDateTime = utcZonedDateTime.withZoneSameInstant(ZoneId.of(timeZone));
+            ZonedDateTime localZonedDateTime =
+                    utcZonedDateTime.withZoneSameInstant(ZoneId.of(timeZone));
 
-            // ✅ Corrected output format to match inputFormat in writeUserRecord
-            DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("MM/dd/yyyy, hh:mm:ss a", Locale.ENGLISH);
+            DateTimeFormatter outputFormatter =
+                    DateTimeFormatter.ofPattern("dd/MM/yyyy, hh:mm:ss a", Locale.ENGLISH);
 
             return localZonedDateTime.format(outputFormatter);
+
         } catch (Exception e) {
             System.err.println("Error parsing time: " + e.getMessage());
             return null;
         }
     }
 
+
     @Override
     public Date convertLocalToUtc(String localDateTime, String timeZone, boolean hasTime) {
         try {
             SimpleDateFormat inputFormat;
-            if (hasTime && localDateTime.contains(":")) {
-                inputFormat = new SimpleDateFormat("MM/dd/yyyy, HH:mm:ss");
-            } else {
-                inputFormat = new SimpleDateFormat("MM/dd/yyyy");
-            }
-            inputFormat.setTimeZone(TimeZone.getTimeZone(timeZone));
 
-            return inputFormat.parse(localDateTime); // parsedDate is now in UTC time zone
+            if (hasTime && localDateTime.contains(":")) {
+                // dd/MM/yyyy, HH:mm:ss (24-hour for safety)
+                inputFormat = new SimpleDateFormat("dd/MM/yyyy, HH:mm:ss", Locale.ENGLISH);
+            } else {
+                // dd/MM/yyyy
+                inputFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH);
+            }
+
+            inputFormat.setTimeZone(TimeZone.getTimeZone(timeZone));
+            return inputFormat.parse(localDateTime);
+
         } catch (ParseException e) {
-            throw new RuntimeException("Error converting local date time to UTC: " + localDateTime + " | hasTime=" + hasTime + " | Error: " + e.getMessage());
+            throw new RuntimeException(
+                    "Error converting local date time to UTC: " +
+                            localDateTime +
+                            " | hasTime=" + hasTime +
+                            " | Error: " + e.getMessage()
+            );
         }
     }
 
+
     @Override
     public String convertDateToString(Date date) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat("MM/dd/yyyy, hh:mm:ss a", Locale.ENGLISH);
+        SimpleDateFormat dateFormat =
+                new SimpleDateFormat("dd/MM/yyyy, hh:mm:ss a", Locale.ENGLISH);
         return dateFormat.format(date);
     }
+
 
     @Override
     public Map<String, Object> uploadFiles(MultipartFile[] files, Integer loginUserId, String folderName) {

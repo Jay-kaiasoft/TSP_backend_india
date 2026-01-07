@@ -1,6 +1,7 @@
 package com.timesheetspro_api.attendancePenaltyRules.controller;
 
 import com.timesheetspro_api.attendancePenaltyRules.service.AttendancePenaltyRulesService;
+import com.timesheetspro_api.auth.config.JwtTokenUtil;
 import com.timesheetspro_api.common.dto.attendancePenaltyRules.AttendancePenaltyRulesDto;
 import com.timesheetspro_api.common.response.ApiResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/attendancePenaltyRules")
 public class AttendancePenaltyRulesController {
+    @Autowired
+    private JwtTokenUtil jwtUtil;
+
     @Autowired
     private AttendancePenaltyRulesService attendancePenaltyRulesService;
 
@@ -37,9 +41,11 @@ public class AttendancePenaltyRulesController {
     }
 
     @PostMapping("/create")
-    public ApiResponse<?> createAttendancePenaltyRule(@RequestBody AttendancePenaltyRulesDto attendancePenaltyRules) {
+    public ApiResponse<?> createAttendancePenaltyRule(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,@RequestBody AttendancePenaltyRulesDto attendancePenaltyRules) {
         Map<String, Object> resBody = new HashMap<>();
         try {
+            Integer userId = Integer.parseInt(jwtUtil.extractUserId(authorizationHeader.substring(7)).toString());
+            attendancePenaltyRules.setCreatedBy(userId);
             return new ApiResponse<>(HttpStatus.CREATED.value(), "Attendance penalty rules created successfully", this.attendancePenaltyRulesService.create(attendancePenaltyRules));
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
@@ -47,9 +53,11 @@ public class AttendancePenaltyRulesController {
     }
 
     @PatchMapping("/update/{id}")
-    public ApiResponse<?> updateAttendancePenaltyRule(@PathVariable Integer id, @RequestBody AttendancePenaltyRulesDto attendancePenaltyRulesDto) {
+    public ApiResponse<?> updateAttendancePenaltyRule(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,@PathVariable Integer id, @RequestBody AttendancePenaltyRulesDto attendancePenaltyRulesDto) {
         Map<String, Object> resBody = new HashMap<>();
         try {
+            Integer userId = Integer.parseInt(jwtUtil.extractUserId(authorizationHeader.substring(7)).toString());
+            attendancePenaltyRulesDto.setCreatedBy(userId);
             return new ApiResponse<>(HttpStatus.OK.value(), "Attendance penalty rules update successfully", this.attendancePenaltyRulesService.update(id, attendancePenaltyRulesDto));
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);

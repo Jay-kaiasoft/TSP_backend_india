@@ -363,55 +363,60 @@ public class UserServiceImpl implements UserService {
                     CompanyEmployee companyEmployee = this.companyEmployeeRepository.findByCompanyNoAndUserName(companyDetails.getId(), loginDto.getUserName());
                     CompanyTheme companyTheme = this.companyThemeRepository.findByCompanyId(companyDetails.getId());
 
-                    if (companyEmployee.getRoles() != null && !companyEmployee.getRoles().getRoleName().equals("Admin") && !companyEmployee.getRoles().getRoleName().equals("Owner") && companyEmployee.getCheckGeofence() == 1) {
-                        if (!companyEmployee.getCompanyLocation().isEmpty()) {
-                            String companyLocation = companyEmployee.getCompanyLocation().replaceAll("[\\[\\]]", ""); // Remove brackets
-                            String[] parts = companyLocation.split(",");
-                            for (int i = 0; i < parts.length; i++) {
-                                LocationDto locationDto = this.locationService.getLocation(Integer.parseInt(parts[i].trim()));
-                                if (locationDto != null) {
-                                    if (locationDto.getGeofenceId() == null || locationDto.getGeofenceId().isEmpty()) {
+                    if (companyEmployee != null){
+                        if (companyEmployee.getRoles() != null && !companyEmployee.getRoles().getRoleName().equals("Admin") && !companyEmployee.getRoles().getRoleName().equals("Owner") && companyEmployee.getCheckGeofence() == 1) {
+                            if (!companyEmployee.getCompanyLocation().isEmpty()) {
+                                String companyLocation = companyEmployee.getCompanyLocation().replaceAll("[\\[\\]]", ""); // Remove brackets
+                                String[] parts = companyLocation.split(",");
+                                for (int i = 0; i < parts.length; i++) {
+                                    LocationDto locationDto = this.locationService.getLocation(Integer.parseInt(parts[i].trim()));
+                                    if (locationDto != null) {
+                                        if (locationDto.getGeofenceId() == null || locationDto.getGeofenceId().isEmpty()) {
+                                            resBody.put("error", "Geofence data is missing or incomplete for one or more locations. Please contact your administrator to configure geofencing for your company's locations before proceeding.");
+                                            return resBody;
+                                        }
+                                    } else {
                                         resBody.put("error", "Geofence data is missing or incomplete for one or more locations. Please contact your administrator to configure geofencing for your company's locations before proceeding.");
                                         return resBody;
                                     }
-                                } else {
-                                    resBody.put("error", "Geofence data is missing or incomplete for one or more locations. Please contact your administrator to configure geofencing for your company's locations before proceeding.");
-                                    return resBody;
                                 }
+                            } else {
+                                resBody.put("error", "Login failed due to internal error.");
+                                return resBody;
                             }
+                        }
+
+                        if (companyEmployee.getPassword().equals(loginDto.getPassword())) {
+                            CompanyEmployeeDto companyEmployeeDto = new CompanyEmployeeDto();
+                            companyEmployeeDto.setCompanyId(companyEmployee.getCompanyDetails().getId());
+                            companyEmployeeDto.setRoleId(companyEmployee.getRoles().getRoleId());
+                            companyEmployeeDto.setRoleName(companyEmployee.getRoles().getRoleName());
+                            companyEmployeeDto.setUserName(companyEmployee.getUsername());
+                            if (companyEmployee.getDepartment() != null) {
+                                companyEmployeeDto.setDepartmentName(companyEmployee.getDepartment().getDepartmentName());
+                            }
+                            if (companyTheme != null) {
+                                companyEmployeeDto.setThemeId(companyTheme.getId());
+                            }
+                            BeanUtils.copyProperties(companyEmployee, companyEmployeeDto);
+
+                            Map<String, Object> userMap = new HashMap<>();
+                            userMap.put("userId", companyEmployee.getEmployeeId());
+                            userMap.put("userName", companyEmployee.getUsername());
+                            userMap.put("roleId", companyEmployee.getRoles().getRoleId());
+                            userMap.put("roleName", companyEmployee.getRoles().getRoleId());
+                            userMap.put("companyId", companyEmployee.getCompanyDetails().getId());
+
+                            final String jwtToken = jwtUtil.generateToken(userMap);
+                            resBody.put("token", jwtToken);
+                            resBody.put("data", companyEmployeeDto);
+                            return resBody;
                         } else {
-                            resBody.put("error", "Login failed due to internal error.");
+                            resBody.put("error", "Invalid credentials.");
                             return resBody;
                         }
-                    }
-
-                    if (companyEmployee != null && companyEmployee.getPassword().equals(loginDto.getPassword())) {
-                        CompanyEmployeeDto companyEmployeeDto = new CompanyEmployeeDto();
-                        companyEmployeeDto.setCompanyId(companyEmployee.getCompanyDetails().getId());
-                        companyEmployeeDto.setRoleId(companyEmployee.getRoles().getRoleId());
-                        companyEmployeeDto.setRoleName(companyEmployee.getRoles().getRoleName());
-                        companyEmployeeDto.setUserName(companyEmployee.getUsername());
-                        if (companyEmployee.getDepartment() != null) {
-                            companyEmployeeDto.setDepartmentName(companyEmployee.getDepartment().getDepartmentName());
-                        }
-                        if (companyTheme != null) {
-                            companyEmployeeDto.setThemeId(companyTheme.getId());
-                        }
-                        BeanUtils.copyProperties(companyEmployee, companyEmployeeDto);
-
-                        Map<String, Object> userMap = new HashMap<>();
-                        userMap.put("userId", companyEmployee.getEmployeeId());
-                        userMap.put("userName", companyEmployee.getUsername());
-                        userMap.put("roleId", companyEmployee.getRoles().getRoleId());
-                        userMap.put("roleName", companyEmployee.getRoles().getRoleId());
-                        userMap.put("companyId", companyEmployee.getCompanyDetails().getId());
-
-                        final String jwtToken = jwtUtil.generateToken(userMap);
-                        resBody.put("token", jwtToken);
-                        resBody.put("data", companyEmployeeDto);
-                        return resBody;
-                    } else {
-                        resBody.put("error", "Invalid credentials.");
+                    }else{
+                        resBody.put("error", "User not found for company Id "+companyDetails.getCompanyNo());
                         return resBody;
                     }
                 } else {

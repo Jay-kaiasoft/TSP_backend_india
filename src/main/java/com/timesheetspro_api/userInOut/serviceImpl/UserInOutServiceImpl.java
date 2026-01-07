@@ -532,8 +532,10 @@ public class UserInOutServiceImpl implements UserInOutService {
             userInOut.setUser(companyEmployee);
             userInOut.setCompanyDetails(companyDetails);
 
-            if (userInOutDto.getId() == null) {
+            if (userInOutDto.getCreatedOn() == null) {
                 userInOut.setCreatedOn(new Date());
+            } else {
+                userInOut.setCreatedOn(this.commonService.convertStringToDate(userInOutDto.getCreatedOn()));
             }
             if (userInOutDto.getTimeIn() != null) {
                 userInOut.setTimeIn(this.convertISOToDate(userInOutDto.getTimeIn()));

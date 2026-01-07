@@ -34,12 +34,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Date;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.Calendar; // Import Calendar class
 
 import java.io.File;
-import java.security.Key;
 import java.util.*;
 
 @Service(value = "companyEmployeeService")
@@ -125,7 +122,7 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                     if ("PF".equals(type) && Boolean.TRUE.equals(emp.getIsPf())) {
                         Map<String, Object> map = new HashMap<>();
                         map.put("employeeId", empId);
-                        map.put("userName", emp.getUsername());
+                        map.put("userName", emp.getFirstName() + " " + emp.getLastName());
                         map.put("daysWorked", daysWorked);
                         map.put("totalDays", totalDays);
                         map.put("pf_type", emp.getPfType());
@@ -168,14 +165,13 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                         }
                         response.add(map);
                     }
-
                     if ("PT".equals(type) && Boolean.TRUE.equals(emp.getIsPt())) {
                         Map<String, Object> map = new HashMap<>();
                         int grossSalary = emp.getGrossSalary();
                         int ptAmount = emp.getPtAmount();
 
                         map.put("employeeId", empId);
-                        map.put("userName", emp.getUsername());
+                        map.put("userName", emp.getFirstName() + " " + emp.getLastName());
                         map.put("gross_salary", grossSalary);
                         map.put("total_gross_salary", grossSalary * month);
                         map.put("pt_amount", ptAmount * month);

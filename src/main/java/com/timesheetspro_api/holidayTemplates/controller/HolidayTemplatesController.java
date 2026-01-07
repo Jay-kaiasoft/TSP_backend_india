@@ -1,5 +1,6 @@
 package com.timesheetspro_api.holidayTemplates.controller;
 
+import com.timesheetspro_api.auth.config.JwtTokenUtil;
 import com.timesheetspro_api.common.dto.holidayTemplates.HolidayTemplatesDto;
 import com.timesheetspro_api.common.response.ApiResponse;
 import com.timesheetspro_api.holidayTemplates.service.HolidayTemplatesService;
@@ -14,6 +15,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/holidayTemplates")
 public class HolidayTemplatesController {
+    @Autowired
+    private JwtTokenUtil jwtUtil;
 
     @Autowired
     private HolidayTemplatesService holidayTemplatesService;
@@ -42,6 +45,8 @@ public class HolidayTemplatesController {
     public ApiResponse<?> createHolidayTemplates(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestBody HolidayTemplatesDto holidayTemplatesDto) {
         Map<String, Object> resBody = new HashMap<>();
         try {
+            Integer userId = Integer.parseInt(jwtUtil.extractUserId(authorizationHeader.substring(7)).toString());
+            holidayTemplatesDto.setCreatedBy(userId);
             return new ApiResponse<>(HttpStatus.CREATED.value(), "Holiday template created successfully", this.holidayTemplatesService.createHolidayTemplate(holidayTemplatesDto));
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
@@ -52,6 +57,8 @@ public class HolidayTemplatesController {
     public ApiResponse<?> updateHolidayTemplates(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @PathVariable Integer id, @RequestBody HolidayTemplatesDto holidayTemplatesDto) {
         Map<String, Object> resBody = new HashMap<>();
         try {
+            Integer userId = Integer.parseInt(jwtUtil.extractUserId(authorizationHeader.substring(7)).toString());
+            holidayTemplatesDto.setCreatedBy(userId);
             return new ApiResponse<>(HttpStatus.OK.value(), "Holiday template updated successfully", this.holidayTemplatesService.updateHolidayTemplate(id, holidayTemplatesDto));
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
