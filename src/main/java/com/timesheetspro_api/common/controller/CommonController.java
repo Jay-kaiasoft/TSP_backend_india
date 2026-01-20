@@ -6,6 +6,7 @@ import com.timesheetspro_api.common.service.CommonService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,54 +17,116 @@ import java.util.*;
 public class CommonController {
     private static final Logger errorLogger = LoggerFactory.getLogger("errorLogger");
 
+    @Value("${timeSheetProDrive}")
+    String FILE_DIRECTORY;
+
+    @Value("${imageContextPath}")
+    String imageContextPath;
+
     @Autowired
     private CommonService commonService;
 
     @Autowired
     private JwtTokenUtil jwtUtil;
 
-    @PostMapping("/uploadFile")
-    public ApiResponse<?> uploadFiles(
+    @PostMapping("/uploadFile/start")
+    public ApiResponse<?> startUpload(
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
             @RequestParam String folderName,
             @RequestParam(required = false) Integer userId,
-            @RequestParam(required = false) MultipartFile[] files, // For multiple files
-            @RequestParam(required = false) MultipartFile file // For a single file
+            @RequestParam String fileName
     ) {
-        Map<String, Object> resBody = new HashMap<>();
-        Integer loginUserId = null;
         try {
-
-            if (authorizationHeader != null) {
-                if (userId != null) {
-                    loginUserId = userId;
-                } else {
-                    loginUserId = Integer.parseInt(jwtUtil.extractUserId(authorizationHeader.substring(7)).toString());
-                }
-            }
-            // Handle both single and multiple files
-            if (file != null) {
-                files = new MultipartFile[]{file}; // Convert single file to array for consistency
-            }
-
-            if (files == null || files.length == 0) {
-                return new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), "No files provided", "");
-            }
-            Map<String, Object> resBodyObjectMap = commonService.uploadFiles(files, loginUserId, folderName);
-
-            if (resBodyObjectMap.get("status").equals("400")) {
-                return new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), resBodyObjectMap.get("message").toString(), "");
-            }
-            return new ApiResponse<>(
-                    HttpStatus.OK.value(),
-                    "Files uploaded successfully",
-                    resBodyObjectMap.get("uploadedFiles")
-            );
+            Map<String, Object> res = this.commonService.startUpload(folderName, userId, fileName);
+            return new ApiResponse<>(HttpStatus.OK.value(), "Upload started", res);
         } catch (Exception e) {
-            e.printStackTrace();
-            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null);
         }
     }
+
+    @PostMapping("/uploadFile/chunk")
+    public ApiResponse<?> uploadChunk(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+            @RequestParam String folderName,
+            @RequestParam(required = false) Integer userId,
+            @RequestParam String uploadId,
+            @RequestParam int chunkIndex,
+            @RequestParam int totalChunks,
+            @RequestParam String originalFileName,
+            @RequestParam MultipartFile chunk
+    ) {
+        try {
+            Map<String, Object> res = this.commonService.uploadChunk(
+                    folderName, userId, uploadId,
+                    chunkIndex, totalChunks, originalFileName, chunk
+            );
+            return new ApiResponse<>(HttpStatus.OK.value(), "Chunk uploaded", res);
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null);
+        }
+    }
+
+    @PostMapping("/uploadFile/complete")
+    public ApiResponse<?> completeUpload(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+            @RequestParam String folderName,
+            @RequestParam(required = false) Integer userId,
+            @RequestParam String uploadId,
+            @RequestParam int totalChunks,
+            @RequestParam String originalFileName
+    ) {
+        try {
+            Map<String, Object> res = this.commonService.completeUpload(
+                    folderName, userId, uploadId, totalChunks, originalFileName
+            );
+            return new ApiResponse<>(HttpStatus.OK.value(), "File merged successfully", res);
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null);
+        }
+    }
+
+//    @PostMapping("/uploadFile")
+//    public ApiResponse<?> uploadFiles(
+//            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+//            @RequestParam String folderName,
+//            @RequestParam(required = false) Integer userId,
+//            @RequestParam(required = false) MultipartFile[] files, // For multiple files
+//            @RequestParam(required = false) MultipartFile file // For a single file
+//    ) {
+//        Map<String, Object> resBody = new HashMap<>();
+//        Integer loginUserId = null;
+//        try {
+//
+//            if (authorizationHeader != null) {
+//                if (userId != null) {
+//                    loginUserId = userId;
+//                } else {
+//                    loginUserId = Integer.parseInt(jwtUtil.extractUserId(authorizationHeader.substring(7)).toString());
+//                }
+//            }
+//            // Handle both single and multiple files
+//            if (file != null) {
+//                files = new MultipartFile[]{file}; // Convert single file to array for consistency
+//            }
+//
+//            if (files == null || files.length == 0) {
+//                return new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), "No files provided", "");
+//            }
+//            Map<String, Object> resBodyObjectMap = this.commonService.uploadFiles(files, loginUserId, folderName);
+//
+//            if (resBodyObjectMap.get("status").equals("400")) {
+//                return new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), resBodyObjectMap.get("message").toString(), "");
+//            }
+//            return new ApiResponse<>(
+//                    HttpStatus.OK.value(),
+//                    "Files uploaded successfully",
+//                    resBodyObjectMap.get("uploadedFiles")
+//            );
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), resBody);
+//        }
+//    }
 
 
     @GetMapping("/getTimezones")
@@ -255,4 +318,3 @@ public class CommonController {
         }
     }
 }
-

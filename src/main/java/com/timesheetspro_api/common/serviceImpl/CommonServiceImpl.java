@@ -7,6 +7,7 @@ import jakarta.mail.Session;
 import jakarta.mail.Transport;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
+import net.coobird.thumbnailator.Thumbnails;
 import org.aspectj.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.awt.image.BufferedImage;
+import java.io.*;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.text.ParseException;
@@ -27,12 +30,12 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
 
-import java.io.File;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
 
 import org.springframework.mail.javamail.JavaMailSender;
+
+import javax.imageio.ImageIO;
 
 @Service(value = "commonService")
 public class CommonServiceImpl implements CommonService {
@@ -50,8 +53,122 @@ public class CommonServiceImpl implements CommonService {
     @Value("${spring.mail.properties.mail.fromName}")
     String mailFromName;
 
+    private static final int MAX_DIM = 1920;
+
     @Autowired
     private JavaMailSender sender;
+
+    @Override
+    public Map<String, Object> startUpload(String folderName, Integer userId, String fileName) {
+
+        int lastDot = fileName.lastIndexOf(".");
+        if (lastDot == -1) {
+            throw new RuntimeException("File has no extension");
+        }
+
+        String extension = fileName.substring(lastDot + 1).toLowerCase();
+        if (!extension.matches("jpg|jpeg|png")) {
+            throw new RuntimeException("Only JPG, JPEG, PNG images are allowed");
+        }
+
+        String safeFileName = fileName.replaceAll("[^a-zA-Z0-9\\.\\-]+", "_");
+
+        String uploadId = UUID.randomUUID().toString();
+
+        String chunkDirPath =
+                FILE_DIRECTORY + userId + "/tempImage/" + folderName + "/chunks/" + uploadId + "/";
+
+        File dir = new File(chunkDirPath);
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new RuntimeException("Failed to create upload directory");
+        }
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("uploadId", uploadId);
+        res.put("fileName", safeFileName);
+
+        return res;
+    }
+
+
+    @Override
+    public Map<String, Object> uploadChunk(
+            String folderName,
+            Integer userId,
+            String uploadId,
+            int chunkIndex,
+            int totalChunks,
+            String originalFileName,
+            MultipartFile chunk
+    ) {
+        String safeName = sanitizeFileName(originalFileName);
+        validateExtension(safeName);
+
+        String chunkDirPath = FILE_DIRECTORY + userId + "/tempImage/" + folderName + "/chunks/" + uploadId + "/";
+        File chunkDir = new File(chunkDirPath);
+        if (!chunkDir.exists()) chunkDir.mkdirs();
+
+        // store chunk
+        File chunkFile = new File(chunkDirPath + chunkIndex + ".part");
+        try {
+            chunk.transferTo(chunkFile);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to save chunk " + chunkIndex + ": " + e.getMessage(), e);
+        }
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("chunkIndex", chunkIndex);
+        res.put("totalChunks", totalChunks);
+        return res;
+    }
+
+    @Override
+    public Map<String, Object> completeUpload(
+            String folderName,
+            Integer userId,
+            String uploadId,
+            int totalChunks,
+            String originalFileName
+    ) {
+        String safeName = sanitizeFileName(originalFileName);
+        validateExtension(safeName);
+
+        String baseDir = FILE_DIRECTORY + userId + "/tempImage/" + folderName + "/";
+        File targetDirectory = new File(baseDir);
+        if (!targetDirectory.exists()) targetDirectory.mkdirs();
+
+        String chunkDirPath = baseDir + "chunks/" + uploadId + "/";
+        File chunkDir = new File(chunkDirPath);
+        if (!chunkDir.exists()) {
+            throw new RuntimeException("Chunk directory not found");
+        }
+
+        File finalFile = new File(baseDir + safeName);
+
+        mergeChunks(chunkDirPath, finalFile, totalChunks);
+
+        File optimized = this.optimizeImage(finalFile);
+
+        if (!optimized.equals(finalFile)) {
+            finalFile.delete();
+            optimized.renameTo(finalFile);
+        }
+
+        setFilePermissions(finalFile);
+
+        // cleanup
+        cleanupChunkDir(chunkDir);
+
+        String fileUrl = imageContextPath + (userId + "/tempImage/" + folderName + "/" + safeName).replace("\\", "/");
+
+        Map<String, String> fileInfo = new HashMap<>();
+        fileInfo.put("imageName", safeName);
+        fileInfo.put("imageURL", fileUrl);
+
+        Map<String, Object> resBody = new HashMap<>();
+        resBody.put("uploadedFiles", List.of(fileInfo));
+        return resBody;
+    }
 
     @Override
     public Date convertStringToDate(String dateStr) {
@@ -83,7 +200,6 @@ public class CommonServiceImpl implements CommonService {
         }
     }
 
-
     @Override
     public String convertUtcToLocal(String utcTime, String timeZone) {
         try {
@@ -109,7 +225,6 @@ public class CommonServiceImpl implements CommonService {
             return null;
         }
     }
-
 
     @Override
     public Date convertLocalToUtc(String localDateTime, String timeZone, boolean hasTime) {
@@ -137,14 +252,12 @@ public class CommonServiceImpl implements CommonService {
         }
     }
 
-
     @Override
     public String convertDateToString(Date date) {
         SimpleDateFormat dateFormat =
                 new SimpleDateFormat("dd/MM/yyyy, hh:mm:ss a", Locale.ENGLISH);
         return dateFormat.format(date);
     }
-
 
     @Override
     public Map<String, Object> uploadFiles(MultipartFile[] files, Integer loginUserId, String folderName) {
@@ -293,11 +406,117 @@ public class CommonServiceImpl implements CommonService {
         }
     }
 
-    private static void setFilePermissions(File file) throws IOException {
-        // Use PosixFilePermissions for Unix-based systems
-        Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
-        if (!System.getProperty("os.name").toLowerCase().contains("win")) {
-            Files.setPosixFilePermissions(file.toPath(), perms);
+    private static void setFilePermissions(File file) {
+        try {
+            if (!System.getProperty("os.name").toLowerCase().contains("win")) {
+                Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxr-xr-x");
+                Files.setPosixFilePermissions(file.toPath(), perms);
+            }
+        } catch (Exception e) {
+            // Don't fail the upload just because chmod failed
+            e.printStackTrace();
+        }
+    }
+
+    private String sanitizeFileName(String originalFileName) {
+        return originalFileName.replaceAll("[^a-zA-Z0-9\\.\\-]+", "_");
+    }
+
+    private void validateExtension(String safeName) {
+        int dot = safeName.lastIndexOf(".");
+        if (dot == -1) throw new RuntimeException("File has no extension");
+
+        String ext = safeName.substring(dot + 1).toLowerCase();
+
+        boolean isVideo = ext.matches("mp4|mkv|avi|mov");
+        boolean isImage = ext.matches("jpg|jpeg|png");
+
+        if (!(isImage || isVideo)) {
+            throw new RuntimeException("." + ext + " File type not supported");
+        }
+    }
+
+    private void mergeChunks(String chunkDirPath, File finalFile, int totalChunks) {
+        // If complete is called again, avoid appending to old file
+        if (finalFile.exists()) finalFile.delete();
+
+        try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(finalFile, true))) {
+            byte[] buffer = new byte[1024 * 1024]; // 1MB buffer
+
+            for (int i = 0; i < totalChunks; i++) {
+                File part = new File(chunkDirPath + i + ".part");
+                if (!part.exists()) {
+                    throw new RuntimeException("Missing chunk: " + i);
+                }
+
+                try (BufferedInputStream in = new BufferedInputStream(new FileInputStream(part))) {
+                    int read;
+                    while ((read = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, read);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to merge chunks: " + e.getMessage(), e);
+        }
+    }
+
+    private void cleanupChunkDir(File chunkDir) {
+        File[] files = chunkDir.listFiles();
+        if (files != null) {
+            for (File f : files) f.delete();
+        }
+        chunkDir.delete();
+    }
+
+    public static File optimizeImage(File inputFile) {
+        try {
+            BufferedImage original = ImageIO.read(inputFile);
+            if (original == null) {
+                // Not an image
+                return inputFile;
+            }
+
+            int width = original.getWidth();
+            int height = original.getHeight();
+
+            int maxSide = Math.max(width, height);
+
+            // 🔴 IMPORTANT: DO NOT UPSCALE
+            if (maxSide <= MAX_DIM) {
+                // Image already small enough → do nothing
+                return inputFile;
+            }
+
+            // Resize ratio
+            double scale = (double) MAX_DIM / maxSide;
+            int newWidth = (int) Math.round(width * scale);
+            int newHeight = (int) Math.round(height * scale);
+
+            String name = inputFile.getName().toLowerCase();
+            File outFile = new File(inputFile.getParentFile(), "opt_" + inputFile.getName());
+
+            if (name.endsWith(".jpg") || name.endsWith(".jpeg")) {
+                Thumbnails.of(inputFile)
+                        .size(newWidth, newHeight)
+                        .outputQuality(0.6)  // visually lossless
+                        .outputFormat("jpg")
+                        .toFile(outFile);
+            } else if (name.endsWith(".png")) {
+                // PNG = lossless recompress + resize
+                Thumbnails.of(inputFile)
+                        .size(newWidth, newHeight)
+                        .outputFormat("png")
+                        .toFile(outFile);
+            } else {
+                return inputFile;
+            }
+
+            return outFile;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return inputFile;
         }
     }
 }
