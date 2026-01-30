@@ -312,8 +312,7 @@ public class CompanyDetailsServiceImpl implements CompanyDetailsService {
     public void deleteCompanyDetails(Integer id) {
         try {
             CompanyDetails companyDetails = this.companyDetailsRepository.findById(id).orElseThrow(() -> new RuntimeException("Company details not found"));
-            companyDetails.setIsActive(0);
-            this.companyDetailsRepository.save(companyDetails);
+            this.companyDetailsRepository.delete(companyDetails);
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage());
         }

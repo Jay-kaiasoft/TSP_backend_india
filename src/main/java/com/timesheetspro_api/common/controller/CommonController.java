@@ -76,11 +76,15 @@ public class CommonController {
             @RequestParam String originalFileName
     ) {
         try {
+            System.out.println("================== \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n ======================= API calling");
             Map<String, Object> res = this.commonService.completeUpload(
                     folderName, userId, uploadId, totalChunks, originalFileName
             );
+            System.out.println("================== \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n ======================= DONE");
             return new ApiResponse<>(HttpStatus.OK.value(), "File merged successfully", res);
         } catch (Exception e) {
+            System.out.println("================== \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n ======================= ERROR"+e);
+            e.printStackTrace();
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), e.getMessage(), null);
         }
     }
