@@ -26,8 +26,7 @@ public class UserInOut {
     @Temporal(TemporalType.TIMESTAMP)
     private Date timeOut;
 
-    @Column(name = "created_on")
-    @Temporal(TemporalType.DATE)
+    @Temporal(TemporalType.TIMESTAMP)
     private Date createdOn;
 
     @ManyToOne(fetch = FetchType.LAZY)

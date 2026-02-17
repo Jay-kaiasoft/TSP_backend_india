@@ -36,8 +36,11 @@ public class CompanyShift {
     private Timestamp endTime;
 
     @Column(name = "hours")
-    private float hours;
+    private Float hours;
 
     @Column(name = "total_hours")
-    private Integer totalHours;
+    private Float totalHours;
+
+    @Column(name = "auto_time_in_after_hours")
+    private Float autoTimeInAfterHours;
 }

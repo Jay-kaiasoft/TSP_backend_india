@@ -22,9 +22,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.Locale;
@@ -170,22 +168,59 @@ public class CommonServiceImpl implements CommonService {
         return resBody;
     }
 
+//    @Override
+//    public Date convertStringToDate(String dateStr) {
+//        try {
+//            SimpleDateFormat formatter;
+//
+//            // Determine format dynamically (DD/MM/YYYY)
+//            if (dateStr.matches("\\d{2}/\\d{2}/\\d{4}")) {
+//                // dd/MM/yyyy
+//                formatter = new SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH);
+//
+//            } else if (dateStr.matches("\\d{4}-\\d{2}-\\d{2}")) {
+//                // yyyy-MM-dd (ISO format)
+//                formatter = new SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH);
+//
+//            } else {
+//                // dd/MM/yyyy, hh:mm:ss a
+//                formatter = new SimpleDateFormat("dd/MM/yyyy, hh:mm:ss a", Locale.ENGLISH);
+//            }
+//
+//            formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+//            formatter.setLenient(false);
+//            return formatter.parse(dateStr);
+//
+//        } catch (ParseException e) {
+//            throw new RuntimeException(
+//                    "Error converting date: " + dateStr + " - " + e.getMessage()
+//            );
+//        }
+//    }
+
     @Override
     public Date convertStringToDate(String dateStr) {
         try {
+            if (dateStr == null || dateStr.trim().isEmpty()) return null;
+
+            // ✅ ISO 8601: "2026-01-31T08:34:45.622Z" or "2026-01-30T18:30:00.000Z"
+            // Also covers strings that include 'T' (common for ISO datetime)
+            if (dateStr.contains("T")) {
+                return Date.from(Instant.parse(dateStr));
+            }
+
             SimpleDateFormat formatter;
 
-            // Determine format dynamically (DD/MM/YYYY)
+            // dd/MM/yyyy
             if (dateStr.matches("\\d{2}/\\d{2}/\\d{4}")) {
-                // dd/MM/yyyy
                 formatter = new SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH);
 
+                // yyyy-MM-dd
             } else if (dateStr.matches("\\d{4}-\\d{2}-\\d{2}")) {
-                // yyyy-MM-dd (ISO format)
                 formatter = new SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH);
 
-            } else {
                 // dd/MM/yyyy, hh:mm:ss a
+            } else {
                 formatter = new SimpleDateFormat("dd/MM/yyyy, hh:mm:ss a", Locale.ENGLISH);
             }
 
@@ -193,12 +228,11 @@ public class CommonServiceImpl implements CommonService {
             formatter.setLenient(false);
             return formatter.parse(dateStr);
 
-        } catch (ParseException e) {
-            throw new RuntimeException(
-                    "Error converting date: " + dateStr + " - " + e.getMessage()
-            );
+        } catch (Exception e) {
+            throw new RuntimeException("Error converting date: " + dateStr + " - " + e.getMessage(), e);
         }
     }
+
 
     @Override
     public String convertUtcToLocal(String utcTime, String timeZone) {
@@ -226,29 +260,62 @@ public class CommonServiceImpl implements CommonService {
         }
     }
 
+//    @Override
+//    public Date convertLocalToUtc(String localDateTime, String timeZone, boolean hasTime) {
+//        try {
+//            SimpleDateFormat inputFormat;
+//
+//            if (hasTime && localDateTime.contains(":")) {
+//                // dd/MM/yyyy, HH:mm:ss (24-hour for safety)
+//                inputFormat = new SimpleDateFormat("dd/MM/yyyy, HH:mm:ss", Locale.ENGLISH);
+//            } else {
+//                // dd/MM/yyyy
+//                inputFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH);
+//            }
+//
+//            inputFormat.setTimeZone(TimeZone.getTimeZone(timeZone));
+//            return inputFormat.parse(localDateTime);
+//
+//        } catch (ParseException e) {
+//            throw new RuntimeException(
+//                    "Error converting local date time to UTC: " +
+//                            localDateTime +
+//                            " | hasTime=" + hasTime +
+//                            " | Error: " + e.getMessage()
+//            );
+//        }
+//    }
+
     @Override
     public Date convertLocalToUtc(String localDateTime, String timeZone, boolean hasTime) {
         try {
-            SimpleDateFormat inputFormat;
+            DateTimeFormatter formatter;
 
             if (hasTime && localDateTime.contains(":")) {
-                // dd/MM/yyyy, HH:mm:ss (24-hour for safety)
-                inputFormat = new SimpleDateFormat("dd/MM/yyyy, HH:mm:ss", Locale.ENGLISH);
+                formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy, HH:mm:ss");
             } else {
-                // dd/MM/yyyy
-                inputFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH);
+                formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
             }
 
-            inputFormat.setTimeZone(TimeZone.getTimeZone(timeZone));
-            return inputFormat.parse(localDateTime);
+            ZoneId zoneId = ZoneId.of(timeZone);
 
-        } catch (ParseException e) {
-            throw new RuntimeException(
-                    "Error converting local date time to UTC: " +
-                            localDateTime +
-                            " | hasTime=" + hasTime +
-                            " | Error: " + e.getMessage()
-            );
+            if (hasTime) {
+                LocalDateTime ldt = LocalDateTime.parse(localDateTime, formatter);
+                ZonedDateTime zdt = ldt.atZone(zoneId);
+                return Date.from(zdt.toInstant());
+            } else {
+                LocalDate ld = LocalDate.parse(localDateTime, formatter);
+
+                ZonedDateTime zdt = ld
+                        .atStartOfDay(ZoneId.of(timeZone))
+                        .withZoneSameInstant(ZoneOffset.UTC);
+
+                return Date.from(zdt.toInstant());
+
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error converting local date time to UTC: " + e.getMessage());
         }
     }
 

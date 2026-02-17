@@ -18,6 +18,7 @@ import com.timesheetspro_api.common.repository.OvertimeRulesRepository;
 import com.timesheetspro_api.common.repository.UserInOutRepository;
 import com.timesheetspro_api.common.repository.company.AttendancePenaltyRulesRepository;
 import com.timesheetspro_api.common.repository.company.CompanyEmployeeRepository;
+import com.timesheetspro_api.common.repository.company.WeeklyOffRepository;
 import com.timesheetspro_api.common.service.CommonService;
 import com.timesheetspro_api.common.specification.EmployeeStatementSpecification;
 import com.timesheetspro_api.common.specification.UserInOutSpecification;
@@ -52,6 +53,9 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
     @Autowired
     private HolidayTemplatesService holidayTemplatesService;
+
+    @Autowired
+    private WeeklyOffRepository weeklyOffRepository;
 
     @Override
     public List<EmployeeSalaryStatementDto> getEmployeeSalaryStatements(SalaryStatementRequestDto salaryStatementRequestDto) {
@@ -126,7 +130,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
         // Get working day configuration
         WeeklyOff workingDayConfig = companyEmployee.getWeeklyOff();
-
         // Calculate all working days for the period (including paid weekly-offs)
         int totalPaidDays = 0;
         if (workingDayConfig != null) {
@@ -218,14 +221,14 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         }
 
         // Calculate overtime
-        int employeeShiftHours = companyEmployee.getCompanyShift() != null ? companyEmployee.getCompanyShift().getTotalHours() : 0;
+        float employeeShiftHours = companyEmployee.getCompanyShift() != null ? companyEmployee.getCompanyShift().getTotalHours() : 0;
         long employeeWorkedMinutes = totalWorkedMillis / (1000 * 60);
-        long totalWorkedMinutes = employeeWorkedMinutes - (actualWorkDays.size() * (companyEmployee.getLunchBreak() !=null ? companyEmployee.getLunchBreak() : 0));
-        long shiftMinutes = employeeShiftHours * 60L;
+        long totalWorkedMinutes = employeeWorkedMinutes - (actualWorkDays.size() * (companyEmployee.getLunchBreak() != null ? companyEmployee.getLunchBreak() : 0));
+        float shiftMinutes = employeeShiftHours * 60L;
 //        System.out.println("============= Employee Shift Hours ============" + employeeShiftHours + " | Shift Minutes: " + shiftMinutes);
 //        System.out.println("============= Total Worked Minutes ============" + totalWorkedMinutes + " | Worked Minutes: " + employeeWorkedMinutes + " | Lunch Breaks Total: " + (actualWorkDays.size() * companyEmployee.getLunchBreak()));
 //        long otMinutes = Math.max(totalWorkedMinutes - (actualWorkDays.size() * shiftMinutes), 0);
-        long otMinutes = Math.max(totalWorkedMinutes - shiftMinutes, 0);
+        float otMinutes = Math.max(totalWorkedMinutes - shiftMinutes, 0);
 //        System.out.println("============= otMinutes ================" + otMinutes);
         int otFinalMinutes = (int) otMinutes;
         int otAmountFinal = calculateOvertimeAmount(companyEmployee, otFinalMinutes);
@@ -465,7 +468,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
     }
 
     // ===== Helper: compute penalty given a rule, day salary & shift hours
-    private int computePenalty(AttendancePenaltyRules rule, int daySalary, int totalHours) {
+    private int computePenalty(AttendancePenaltyRules rule, int daySalary, float totalHours) {
 //        if (totalHours == null || totalHours <= 0) totalHours = 8; // fallback
         float perHourSalary = daySalary / (float) totalHours;
         perHourSalary = new BigDecimal(perHourSalary).setScale(2, RoundingMode.HALF_UP).floatValue();
@@ -496,7 +499,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         Integer basic = employee.getBasicSalary();
         if (basic == null || basic <= 0) return 0;
         int daySalary = basic / 30;
-        Integer totalHours = employee.getCompanyShift().getTotalHours();
+        float totalHours = employee.getCompanyShift().getTotalHours();
 
         ZoneId zone = ZoneId.systemDefault();
         LocalDateTime actualIn = timeInDate.toInstant().atZone(zone).toLocalDateTime();
@@ -520,7 +523,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         Integer basic = employee.getBasicSalary();
         if (basic == null || basic <= 0) return 0;
         int daySalary = basic / 30;
-        Integer totalHours = employee.getCompanyShift().getTotalHours();
+        float totalHours = employee.getCompanyShift().getTotalHours();
 
         ZoneId zone = ZoneId.systemDefault();
         LocalDateTime actualOut = timeOutDate.toInstant().atZone(zone).toLocalDateTime();
@@ -537,7 +540,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
     }
 
     // ===== Shared: pick rule & apply
-    private int pickAndApplyRule(CompanyEmployee employee, int daySalary, int totalHours, long diffMinutes, boolean type) {
+    private int pickAndApplyRule(CompanyEmployee employee, int daySalary, float totalHours, long diffMinutes, boolean type) {
         List<AttendancePenaltyRules> rules =
                 attendancePenaltyRulesRepository.findByCompanyId(employee.getCompanyDetails().getId(), type);
         if (rules == null || rules.isEmpty()) return 0;
@@ -574,8 +577,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
     }
 
 }
-
-
 
 
 //package com.timesheetspro_api.employeeStatements.serviceImpl;
@@ -801,11 +802,11 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 //        long employeeWorkedMinutes = totalWorkedMillis / (1000 * 60);
 //        long totalWorkedMinutes = employeeWorkedMinutes - (actualWorkDays.size() * companyEmployee.getLunchBreak());
 //        long shiftMinutes = employeeShiftHours * 60L;
-////        System.out.println("============= Employee Shift Hours ============" + employeeShiftHours + " | Shift Minutes: " + shiftMinutes);
-////        System.out.println("============= Total Worked Minutes ============" + totalWorkedMinutes + " | Worked Minutes: " + employeeWorkedMinutes + " | Lunch Breaks Total: " + (actualWorkDays.size() * companyEmployee.getLunchBreak()));
-////        long otMinutes = Math.max(totalWorkedMinutes - (actualWorkDays.size() * shiftMinutes), 0);
+/// /        System.out.println("============= Employee Shift Hours ============" + employeeShiftHours + " | Shift Minutes: " + shiftMinutes);
+/// /        System.out.println("============= Total Worked Minutes ============" + totalWorkedMinutes + " | Worked Minutes: " + employeeWorkedMinutes + " | Lunch Breaks Total: " + (actualWorkDays.size() * companyEmployee.getLunchBreak()));
+/// /        long otMinutes = Math.max(totalWorkedMinutes - (actualWorkDays.size() * shiftMinutes), 0);
 //        long otMinutes = Math.max(totalWorkedMinutes - shiftMinutes, 0);
-////        System.out.println("============= otMinutes ================" + otMinutes);
+/// /        System.out.println("============= otMinutes ================" + otMinutes);
 //        int otFinalMinutes = (int) otMinutes;
 //        int otAmountFinal = calculateOvertimeAmount(companyEmployee, otFinalMinutes);
 //
@@ -1003,7 +1004,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 //        if ("Percentage".equals(employee.getPfType())) {
 //            Integer pfPercentage = Optional.ofNullable(employee.getPfPercentage()).orElse(0);
 //            BigDecimal basicSalaryPerMonth = BigDecimal.valueOf(employee.getBasicSalary());
-////          BigDecimal basicSalaryPerDay = basicSalaryPerMonth.divide(BigDecimal.valueOf(30), 2, RoundingMode.HALF_UP);
+/// /          BigDecimal basicSalaryPerDay = basicSalaryPerMonth.divide(BigDecimal.valueOf(30), 2, RoundingMode.HALF_UP);
 //            BigDecimal pfAmount = basicSalaryPerMonth
 //                    .multiply(BigDecimal.valueOf(pfPercentage))
 //                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
@@ -1046,7 +1047,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 //
 //    // ===== Helper: compute penalty given a rule, day salary & shift hours
 //    private int computePenalty(AttendancePenaltyRules rule, int daySalary, int totalHours) {
-////        if (totalHours == null || totalHours <= 0) totalHours = 8; // fallback
+/// /        if (totalHours == null || totalHours <= 0) totalHours = 8; // fallback
 //        float perHourSalary = daySalary / (float) totalHours;
 //        perHourSalary = new BigDecimal(perHourSalary).setScale(2, RoundingMode.HALF_UP).floatValue();
 //        float perMinuteSalary = perHourSalary / 60f;

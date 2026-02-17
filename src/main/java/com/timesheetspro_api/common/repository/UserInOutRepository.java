@@ -17,11 +17,11 @@ public interface UserInOutRepository extends JpaRepository<UserInOut, Long>, Jpa
                                          @Param("startOfDay") Date startOfDay,
                                          @Param("endOfDay") Date endOfDay);
 
-    @Query("SELECT COUNT(DISTINCT u.user.id) FROM UserInOut u WHERE u.timeIn IS NOT NULL AND u.timeIn BETWEEN :startOfDay AND :endOfDay")
-    long countCheckedInUsers(@Param("startOfDay") Date startOfDay, @Param("endOfDay") Date endOfDay);
+    @Query("SELECT COUNT(DISTINCT u.user.id) FROM UserInOut u WHERE u.companyDetails.id=:id AND u.timeIn IS NOT NULL AND u.timeIn BETWEEN :startOfDay AND :endOfDay")
+    long countCheckedInUsers(@Param("id") int id, @Param("startOfDay") Date startOfDay, @Param("endOfDay") Date endOfDay);
 
-    @Query("SELECT COUNT(DISTINCT u.user.id) FROM UserInOut u WHERE u.timeOut BETWEEN :startOfDay AND :endOfDay")
-    long countCheckedOutUsers(@Param("startOfDay") Date startOfDay, @Param("endOfDay") Date endOfDay);
+    @Query("SELECT COUNT(DISTINCT u.user.id) FROM UserInOut u WHERE u.companyDetails.id=:id AND u.timeOut BETWEEN :startOfDay AND :endOfDay")
+    long countCheckedOutUsers(@Param("id") int id,@Param("startOfDay") Date startOfDay, @Param("endOfDay") Date endOfDay);
 
     @Query("SELECT u FROM UserInOut u WHERE u.timeOut IS NULL AND u.user.id=:userId")
     UserInOut getLastRecord(@Param("userId") int userId);

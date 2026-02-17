@@ -20,11 +20,13 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.RegionUtil;
 
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -83,8 +85,8 @@ public class UserInOutServiceImpl implements UserInOutService {
             calendar.set(Calendar.SECOND, 59);
             Date endOfDay = calendar.getTime();
 
-            Long countCheckedInUsers = this.userInOutRepository.countCheckedInUsers(startOfDay, endOfDay);
-            Long countCheckedOutUsers = this.userInOutRepository.countCheckedOutUsers(startOfDay, endOfDay);
+            Long countCheckedInUsers = this.userInOutRepository.countCheckedInUsers(companyId, startOfDay, endOfDay);
+            Long countCheckedOutUsers = this.userInOutRepository.countCheckedOutUsers(companyId, startOfDay, endOfDay);
             Long getCompanyTotalUserCount = this.companyEmployeeRepository.getCompanyTotalUserCount(companyId);
             res.put("countCheckedInUsers", countCheckedInUsers);
             res.put("countCheckedOutUsers", countCheckedOutUsers);
@@ -99,7 +101,6 @@ public class UserInOutServiceImpl implements UserInOutService {
     @Override
     public List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds, Integer companyId) {
         try {
-
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
             dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
 
@@ -132,7 +133,8 @@ public class UserInOutServiceImpl implements UserInOutService {
 
             spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(end));
 
-            List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec);
+            List<UserInOut> userInOutList =
+                    this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "id"));
             List<UserInOutDto> userInOutDtoList = userInOutList.stream()
                     .map(userInOut -> {
                         UserInOutDto dto = new UserInOutDto();
@@ -504,7 +506,44 @@ public class UserInOutServiceImpl implements UserInOutService {
             CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("Employee not found"));
 
+            Timestamp shiftEnd = companyEmployee.getCompanyShift().getEndTime();
+            Float autoTimeInAfterHours = companyEmployee.getCompanyShift().getAutoTimeInAfterHours();
+
+            Date currentTime = new Date();
+
+            // Convert shiftEnd to today’s date with same time
+            Calendar shiftCal = Calendar.getInstance();
+            shiftCal.setTime(shiftEnd);
+
+            Calendar currentCal = Calendar.getInstance();
+            currentCal.setTime(currentTime);
+
+            // Set shiftEnd date same as today
+            shiftCal.set(Calendar.YEAR, currentCal.get(Calendar.YEAR));
+            shiftCal.set(Calendar.MONTH, currentCal.get(Calendar.MONTH));
+            shiftCal.set(Calendar.DAY_OF_MONTH, currentCal.get(Calendar.DAY_OF_MONTH));
+
+            Date shiftEndToday = shiftCal.getTime();
+
+            // Calculate gap in milliseconds
+            long diffMillis = currentTime.getTime() - shiftEndToday.getTime();
+
+            if (diffMillis > 0) {
+
+                // Convert autoTimeInAfterHours to minutes properly
+                int hours = autoTimeInAfterHours.intValue();
+                int minutes = Math.round((autoTimeInAfterHours - hours) * 100);
+
+                long allowedMillis = (hours * 60L + minutes) * 60 * 1000;
+
+                if (diffMillis > allowedMillis) {
+                    this.createUserInOut(userId, locationId, companyId);
+                    return "created:" + companyEmployee.getUsername();
+                }
+            }
+
             UserInOut isExisting = this.userInOutRepository.getCurrentUserRecord(userId);
+
             if (isExisting != null) {
                 this.updateUserInOut(isExisting.getId(), userId);
                 return "updated:" + companyEmployee.getUsername();
@@ -512,11 +551,13 @@ public class UserInOutServiceImpl implements UserInOutService {
                 this.createUserInOut(userId, locationId, companyId);
                 return "created:" + companyEmployee.getUsername();
             }
+
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
+
 
     @Override
     public UserInOutDto addClockInOut(UserInOutDto userInOutDto) {
@@ -532,23 +573,42 @@ public class UserInOutServiceImpl implements UserInOutService {
             userInOut.setUser(companyEmployee);
             userInOut.setCompanyDetails(companyDetails);
 
+//            if (userInOutDto.getCreatedOn() == null) {
+//                userInOut.setCreatedOn(new Date());
+//            } else {
+//                userInOut.setCreatedOn(this.convertISOToDate(userInOutDto.getCreatedOn()));
+//            }
+//
+//            if (userInOutDto.getTimeIn() != null) {
+//                userInOut.setTimeIn(this.convertISOToDate(userInOutDto.getTimeIn()));
+//            } else {
+////                Date currentDate = new Date();
+////                userInOut.setTimeIn(currentDate);
+//                throw new RuntimeException("Clock In is required");
+//            }
+//            if (userInOutDto.getTimeOut() != null) {
+//                userInOut.setTimeOut(this.convertISOToDate(userInOutDto.getTimeOut()));
+//            } else {
+//                userInOut.setTimeOut(null);
+//            }
             if (userInOutDto.getCreatedOn() == null) {
                 userInOut.setCreatedOn(new Date());
             } else {
-                userInOut.setCreatedOn(this.commonService.convertStringToDate(userInOutDto.getCreatedOn()));
+                userInOut.setCreatedOn(parseAnyDate(userInOutDto.getCreatedOn()));
             }
+
             if (userInOutDto.getTimeIn() != null) {
-                userInOut.setTimeIn(this.convertISOToDate(userInOutDto.getTimeIn()));
+                userInOut.setTimeIn(parseAnyDate(userInOutDto.getTimeIn()));
             } else {
-//                Date currentDate = new Date();
-//                userInOut.setTimeIn(currentDate);
                 throw new RuntimeException("Clock In is required");
             }
+
             if (userInOutDto.getTimeOut() != null) {
-                userInOut.setTimeOut(this.convertISOToDate(userInOutDto.getTimeOut()));
+                userInOut.setTimeOut(parseAnyDate(userInOutDto.getTimeOut()));
             } else {
                 userInOut.setTimeOut(null);
             }
+
             this.userInOutRepository.save(userInOut);
             return userInOutDto;
         } catch (Exception e) {
@@ -791,12 +851,42 @@ public class UserInOutServiceImpl implements UserInOutService {
         return String.format("%d hr %02d min", hours, minutes);
     }
 
-    public Date convertISOToDate(String isoDateString) {
+    public Date parseAnyDate(String s) {
         try {
-            Instant instant = Instant.parse(isoDateString);
-            return Date.from(instant);
+            if (s == null || s.trim().isEmpty()) return null;
+            s = s.trim();
+
+            // 1) ISO with time (Z or offset) - e.g. 2026-01-31T08:34:45.622Z
+            if (s.contains("T")) {
+                return Date.from(Instant.parse(s));
+            }
+
+            // 2) dd/MM/yyyy - e.g. 31/01/2026
+            if (s.matches("\\d{2}/\\d{2}/\\d{4}")) {
+                SimpleDateFormat f = new SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH);
+                f.setLenient(false);
+                // choose timezone: if this represents a "date only", usually treat it as local start-of-day
+                // If you want it as UTC midnight, keep UTC.
+                f.setTimeZone(TimeZone.getTimeZone("UTC"));
+                return f.parse(s);
+            }
+
+            // 3) yyyy-MM-dd - e.g. 2026-01-31
+            if (s.matches("\\d{4}-\\d{2}-\\d{2}")) {
+                SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH);
+                f.setLenient(false);
+                f.setTimeZone(TimeZone.getTimeZone("UTC"));
+                return f.parse(s);
+            }
+
+            // 4) dd/MM/yyyy, hh:mm:ss a
+            SimpleDateFormat f = new SimpleDateFormat("dd/MM/yyyy, hh:mm:ss a", Locale.ENGLISH);
+            f.setLenient(false);
+            f.setTimeZone(TimeZone.getTimeZone("UTC"));
+            return f.parse(s);
+
         } catch (Exception e) {
-            throw new RuntimeException("Invalid date format: " + isoDateString, e);
+            throw new RuntimeException("Invalid date format: " + s, e);
         }
     }
 

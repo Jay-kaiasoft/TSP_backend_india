@@ -59,7 +59,7 @@ public class OvertimeRulesServiceImpl implements OvertimeRulesService {
     @Override
     public OvertimeRulesDto createOvertimeRule(OvertimeRulesDto overtimeRulesDto, int companyId) {
         try {
-            OvertimeRules isExites = this.overtimeRulesRepository.findByRuleName(overtimeRulesDto.getRuleName());
+            OvertimeRules isExites = this.overtimeRulesRepository.findDuplicateRuleName(null, overtimeRulesDto.getRuleName(), companyId);
             if (isExites != null) {
                 throw new RuntimeException("Overtime rule with name '" + overtimeRulesDto.getRuleName() + "' already exists.");
             }
@@ -86,7 +86,7 @@ public class OvertimeRulesServiceImpl implements OvertimeRulesService {
     @Override
     public OvertimeRulesDto updateOvertimeRule(int id, OvertimeRulesDto overtimeRulesDto) {
         try {
-            OvertimeRules isExites = this.overtimeRulesRepository.findByRuleName(id, overtimeRulesDto.getRuleName());
+            OvertimeRules isExites = this.overtimeRulesRepository.findDuplicateRuleName(id, overtimeRulesDto.getRuleName(), overtimeRulesDto.getCompanyId());
             if (isExites != null) {
                 throw new RuntimeException("Overtime rule with name '" + overtimeRulesDto.getRuleName() + "' already exists.");
             }

@@ -157,6 +157,15 @@ public class WeeklyOffServiceImpl implements WeeklyOffService {
                 this.repository.save(defaultWeeklyOff);
             }
             this.repository.save(weeklyOff);
+            List<CompanyEmployee> companyEmployeeList = this.companyEmployeeRepository.findByCompanyId(weeklyOff.getCompanyDetails().getId());
+            if (companyEmployeeList != null) {
+                for (CompanyEmployee companyEmployee : companyEmployeeList) {
+                    if (companyEmployee.getEmployeeType().getName().equals("Salaried")){
+                        companyEmployee.setWeeklyOff(weeklyOff);
+                        this.companyEmployeeRepository.save(companyEmployee);
+                    }
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e);

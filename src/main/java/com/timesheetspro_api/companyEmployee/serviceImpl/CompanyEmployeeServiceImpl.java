@@ -321,7 +321,7 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 WeeklyOff weeklyOff = this.weeklyOffRepository.findById(companyEmployeeDto.getWeeklyOffId()).orElseThrow(() -> new RuntimeException("Weekly off not found"));
                 companyEmployee.setWeeklyOff(weeklyOff);
             } else {
-                WeeklyOff weeklyOff = this.weeklyOffRepository.findDefault();
+                WeeklyOff weeklyOff = this.weeklyOffRepository.findDefault(companyDetails.getId());
                 companyEmployee.setWeeklyOff(weeklyOff);
             }
             if (companyEmployeeDto.getHolidayTemplateId() != null) {
@@ -379,7 +379,7 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 WeeklyOff weeklyOff = this.weeklyOffRepository.findById(companyEmployeeDto.getWeeklyOffId()).orElseThrow(() -> new RuntimeException("Weekly off not found"));
                 companyEmployee.setWeeklyOff(weeklyOff);
             } else {
-                WeeklyOff weeklyOff = this.weeklyOffRepository.findDefault();
+                WeeklyOff weeklyOff = this.weeklyOffRepository.findDefault(companyDetails.getId());
                 companyEmployee.setWeeklyOff(weeklyOff);
             }
             if (companyEmployeeDto.getHolidayTemplateId() != null) {

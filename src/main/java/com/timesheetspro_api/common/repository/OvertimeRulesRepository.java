@@ -14,9 +14,19 @@ public interface OvertimeRulesRepository extends JpaRepository<OvertimeRules, In
     @Query("SELECT o FROM OvertimeRules o WHERE o.companyDetails.id=:id")
     List<OvertimeRules> findByCompanyId(int id);
 
-    @Query("SELECT o FROM OvertimeRules o WHERE o.ruleName=:ruleName")
-    OvertimeRules findByRuleName(String ruleName);
+//    @Query("SELECT o FROM OvertimeRules o WHERE o.ruleName=:ruleName")
+//    OvertimeRules findByRuleName(String ruleName);
 
-    @Query("SELECT o FROM OvertimeRules o WHERE o.id != :id AND o.ruleName =:ruleName")
-    OvertimeRules findByRuleName(@Param("id") int id, @Param("ruleName") String ruleName);
+    @Query("""
+               SELECT o FROM OvertimeRules o
+               WHERE o.ruleName = :ruleName
+                 AND o.companyDetails.id = :companyId
+                 AND (:id IS NULL OR o.id <> :id)
+            """)
+    OvertimeRules findDuplicateRuleName(
+            @Param("id") Integer id,
+            @Param("ruleName") String ruleName,
+            @Param("companyId") Integer companyId
+    );
+
 }

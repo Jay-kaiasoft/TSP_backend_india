@@ -70,6 +70,7 @@ public class CompanyShiftServiceImpl implements CompanyShiftService {
             BeanUtils.copyProperties(companyShift, companyShiftDto);
             return companyShiftDto;
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
@@ -86,6 +87,7 @@ public class CompanyShiftServiceImpl implements CompanyShiftService {
             }
             return companyShiftDtoList;
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }

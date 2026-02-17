@@ -12,6 +12,7 @@ public class CompanyShiftDto {
     private String shiftType;
     private Timestamp startTime;
     private Timestamp endTime;
-    private float hours;
-    private Integer totalHours;
+    private Float hours;
+    private Float totalHours;
+    private Float autoTimeInAfterHours;
 }
