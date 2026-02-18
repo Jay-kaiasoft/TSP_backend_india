@@ -26,6 +26,7 @@ public class CompanyDetailsDto {
     private String registerDate;
     private String ein;
     private String organizationType;
+    private String autoTimeInAfterHours; // format: HH:mm
 
     private List<LocationDto> locations;
     private CompanyEmployeeDto companyEmployeeDto;

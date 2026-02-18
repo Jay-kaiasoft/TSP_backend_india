@@ -41,6 +41,4 @@ public class CompanyShift {
     @Column(name = "total_hours")
     private Float totalHours;
 
-    @Column(name = "auto_time_in_after_hours")
-    private Float autoTimeInAfterHours;
 }

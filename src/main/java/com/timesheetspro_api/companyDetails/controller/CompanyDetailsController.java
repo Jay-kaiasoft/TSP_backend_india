@@ -126,4 +126,26 @@ public class CompanyDetailsController {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to fetch company details", resBody);
         }
     }
+
+    @PostMapping("/updateAutoTimeInAfterHours/{companyId}")
+    public ApiResponse<?> updateAutoTimeInAfterHours(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @PathVariable Integer companyId, @RequestBody Map<String, Object> req) {
+        Map<String, Object> resBody = new HashMap<>();
+        try {
+            String time = req.get("time").toString();
+            this.companyDetailsService.updateAutoTimeInAfterHours(companyId, time);
+            return new ApiResponse<>(HttpStatus.OK.value(), "Company details updated successfully", "");
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to update company details", resBody);
+        }
+    }
+
+    @GetMapping("/getAutoTimeInAfterHours/{companyId}")
+    public ApiResponse<?> getAutoTimeInAfterHours(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @PathVariable Integer companyId) {
+        Map<String, Object> resBody = new HashMap<>();
+        try {
+            return new ApiResponse<>(HttpStatus.OK.value(), "Company details fetched successfully", this.companyDetailsService.getAutoTimeInAfterHours(companyId));
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to fetch company details", resBody);
+        }
+    }
 }

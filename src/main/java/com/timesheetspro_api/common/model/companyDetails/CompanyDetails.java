@@ -60,4 +60,6 @@ public class CompanyDetails {
     @OneToMany(mappedBy = "companyDetails", fetch = FetchType.LAZY)
     private List<CompanyEmployee> companyEmployees;
 
+    @Column(name = "auto_time_in_after_hours")
+    private String autoTimeInAfterHours; // format: HH:mm
 }

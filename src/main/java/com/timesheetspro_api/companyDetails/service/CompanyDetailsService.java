@@ -27,4 +27,7 @@ public interface CompanyDetailsService {
 
     String getLastCompany();
 
+    void updateAutoTimeInAfterHours(Integer companyId, String data);
+
+    String getAutoTimeInAfterHours(Integer companyId);
 }

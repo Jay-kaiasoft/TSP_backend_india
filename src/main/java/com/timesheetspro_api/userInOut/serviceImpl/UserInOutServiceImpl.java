@@ -29,8 +29,7 @@ import org.springframework.stereotype.Service;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.time.OffsetDateTime;
+import java.time.*;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -213,25 +212,405 @@ public class UserInOutServiceImpl implements UserInOutService {
         }
     }
 
-    public UserInOutDto createUserInOut(int userId, Integer locationId, Integer companyId) {
+//    public UserInOutDto createUserInOut(int userId, Integer locationId, Integer companyId) {
+//        try {
+//            UserInOut userInOut = new UserInOut();
+//            CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userId).orElseThrow(() -> new RuntimeException("Employee not found"));
+//            userInOut.setUser(companyEmployee);
+//            CompanyDetails companyDetails = this.companyDetailsRepository.findById(companyId).orElseThrow(() -> new RuntimeException("Company not found"));
+//            Date currentDate = new Date();
+//            userInOut.setTimeIn(currentDate);
+//            userInOut.setCreatedOn(currentDate);
+//            userInOut.setCompanyDetails(companyDetails);
+//            userInOut.setIsSalaryGenerate(0);
+//            if (locationId != null && locationId > 0) {
+//                Locations locations = this.locationsRepository.findById(locationId).orElseThrow(() -> new RuntimeException("Location not found"));
+//                if (locations != null) {
+//                    userInOut.setLocations(locations);
+//                }
+//            }
+//            this.userInOutRepository.save(userInOut);
+//            UserInOutDto res = new UserInOutDto();
+//            res.setId(userInOut.getId());
+//            return res;
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            throw new RuntimeException(e.getMessage());
+//        }
+//    }
+//
+//    public void updateUserInOut(Long id, int userId) {
+//
+//        try {
+//
+//            UserInOut userInOut = this.userInOutRepository.getLastRecord(userId);
+//
+//            if (userInOut == null) {
+//                throw new RuntimeException("No existing record found");
+//            }
+//
+//            CompanyEmployee employee = this.companyEmployeeRepository
+//                    .findById(userId)
+//                    .orElseThrow(() -> new RuntimeException("Employee not found"));
+//
+//            userInOut.setUser(employee);
+//
+//            // ===============================
+//            // 1️⃣ Current UTC time
+//            // ===============================
+//
+//            Instant nowInstant = Instant.now();
+//            LocalDateTime nowUtc =
+//                    LocalDateTime.ofInstant(nowInstant, ZoneOffset.UTC);
+//
+//            // ===============================
+//            // 2️⃣ Get shift times (LOCAL)
+//            // ===============================
+//
+//            LocalTime shiftStart = employee.getCompanyShift()
+//                    .getStartTime()
+//                    .toLocalDateTime()
+//                    .toLocalTime();
+//
+//            LocalTime shiftEnd = employee.getCompanyShift()
+//                    .getEndTime()
+//                    .toLocalDateTime()
+//                    .toLocalTime();
+//
+//            String autoTimeInAfter =
+//                    employee.getCompanyShift().getAutoTimeInAfterHours();
+//
+//            LocalDate today = nowUtc.toLocalDate();
+//
+//            LocalDateTime shiftStartDateTime =
+//                    LocalDateTime.of(today, shiftStart);
+//
+//            LocalDateTime shiftEndDateTime =
+//                    LocalDateTime.of(today, shiftEnd);
+//
+//            // ===============================
+//            // 3️⃣ Handle midnight shift
+//            // ===============================
+//
+//            if (shiftEnd.isBefore(shiftStart)) {
+//
+//                if (nowUtc.toLocalTime().isBefore(shiftEnd)) {
+//                    shiftStartDateTime = shiftStartDateTime.minusDays(1);
+//                } else {
+//                    shiftEndDateTime = shiftEndDateTime.plusDays(1);
+//                }
+//            }
+//
+//            // ===============================
+//            // 4️⃣ Parse allowed gap (HH:mm)
+//            // ===============================
+//
+//            Duration allowedDuration = Duration.ZERO;
+//
+//            if (autoTimeInAfter != null && !autoTimeInAfter.isEmpty()) {
+//
+//                String[] parts = autoTimeInAfter.split(":");
+//
+//                int hours = Integer.parseInt(parts[0]);
+//                int minutes = Integer.parseInt(parts[1]);
+//
+//                allowedDuration =
+//                        Duration.ofHours(hours).plusMinutes(minutes);
+//            }
+//
+//            // ===============================
+//            // 5️⃣ Calculate gap
+//            // ===============================
+//
+//            Duration gap = Duration.between(shiftEndDateTime, nowUtc);
+//
+//            // ===============================
+//            // 6️⃣ Apply same logic as clickInOut
+//            // ===============================
+//
+//            if (!gap.isNegative() && gap.compareTo(allowedDuration) > 0) {
+//
+//                // ❌ Gap exceeded → create new record
+//                createUserInOut(
+//                        employee.getEmployeeId(),
+//                        userInOut.getLocations().getId(),
+//                        employee.getCompanyDetails().getId()
+//                );
+//
+//                return;
+//            }
+//
+//            // ✅ Otherwise update existing
+//            userInOut.setTimeOut(Date.from(nowInstant));
+//            this.userInOutRepository.save(userInOut);
+//
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            throw new RuntimeException(e.getMessage());
+//        }
+//    }
+//
+//    public UserInOutDto updateUserInOut(UserInOutDto dto) {
+//
+//        try {
+//
+//            UserInOut userInOut = this.userInOutRepository.findById(dto.getId())
+//                    .orElseThrow(() -> new RuntimeException("UserInOut record not found"));
+//
+//            CompanyEmployee employee = this.companyEmployeeRepository.findById(dto.getUserId())
+//                    .orElseThrow(() -> new RuntimeException("Employee not found"));
+//
+//            userInOut.setUser(employee);
+//
+//            // ===============================
+//            // 1️⃣ Parse timeOut (UTC)
+//            // ===============================
+//
+//            Instant timeOutInstant = null;
+//
+//            if (dto.getTimeOut() != null && !dto.getTimeOut().isEmpty()) {
+//
+//                OffsetDateTime odt = OffsetDateTime.parse(dto.getTimeOut());
+//                timeOutInstant = odt.toInstant();
+//            }
+//
+//            if (timeOutInstant == null) {
+//                throw new RuntimeException("TimeOut is required for update");
+//            }
+//
+//            LocalDateTime timeOutUtc =
+//                    LocalDateTime.ofInstant(timeOutInstant, ZoneOffset.UTC);
+//
+//            // ===============================
+//            // 2️⃣ Get shift times (LOCAL)
+//            // ===============================
+//
+//            LocalTime shiftStart = employee.getCompanyShift()
+//                    .getStartTime()
+//                    .toLocalDateTime()
+//                    .toLocalTime();
+//
+//            LocalTime shiftEnd = employee.getCompanyShift()
+//                    .getEndTime()
+//                    .toLocalDateTime()
+//                    .toLocalTime();
+//
+//            String autoTimeInAfter = employee.getCompanyShift()
+//                    .getAutoTimeInAfterHours();
+//
+//            LocalDate date = timeOutUtc.toLocalDate();
+//
+//            LocalDateTime shiftStartDateTime = LocalDateTime.of(date, shiftStart);
+//            LocalDateTime shiftEndDateTime = LocalDateTime.of(date, shiftEnd);
+//
+//            // ===============================
+//            // 3️⃣ Handle midnight shift
+//            // ===============================
+//
+//            if (shiftEnd.isBefore(shiftStart)) {
+//
+//                if (timeOutUtc.toLocalTime().isBefore(shiftEnd)) {
+//                    shiftStartDateTime = shiftStartDateTime.minusDays(1);
+//                } else {
+//                    shiftEndDateTime = shiftEndDateTime.plusDays(1);
+//                }
+//            }
+//
+//            // ===============================
+//            // 4️⃣ Parse allowed duration
+//            // ===============================
+//
+//            Duration allowedDuration = Duration.ZERO;
+//
+//            if (autoTimeInAfter != null && !autoTimeInAfter.isEmpty()) {
+//
+//                String[] parts = autoTimeInAfter.split(":");
+//
+//                int hours = Integer.parseInt(parts[0]);
+//                int minutes = Integer.parseInt(parts[1]);
+//
+//                allowedDuration =
+//                        Duration.ofHours(hours).plusMinutes(minutes);
+//            }
+//
+//            // ===============================
+//            // 5️⃣ Calculate gap
+//            // ===============================
+//
+//            Duration gap = Duration.between(shiftEndDateTime, timeOutUtc);
+//
+//            // ===============================
+//            // 6️⃣ Apply same logic as clickInOut
+//            // ===============================
+//
+//            if (!gap.isNegative() && gap.compareTo(allowedDuration) > 0) {
+//
+//                // ❌ Gap exceeded → create new record
+//
+//                createUserInOut(employee.getEmployeeId(),
+//                        dto.getLocationId(),
+//                        employee.getCompanyDetails().getId());
+//
+//                return dto;
+//            }
+//
+//            // ✅ Otherwise update normally
+//
+//            userInOut.setTimeOut(Date.from(timeOutInstant));
+//            this.userInOutRepository.save(userInOut);
+//
+//            return dto;
+//
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            throw new RuntimeException(e.getMessage());
+//        }
+//    }
+//
+//    @Override
+//    public String clickInOut(int userId, Integer locationId, Integer companyId) {
+//
+//        try {
+//
+//            CompanyEmployee employee = companyEmployeeRepository.findById(userId)
+//                    .orElseThrow(() -> new RuntimeException("Employee not found"));
+//
+//            LocalTime shiftStart = employee.getCompanyShift()
+//                    .getStartTime()
+//                    .toLocalDateTime()
+//                    .toLocalTime();
+//
+//            LocalTime shiftEnd = employee.getCompanyShift()
+//                    .getEndTime()
+//                    .toLocalDateTime()
+//                    .toLocalTime();
+//
+//            String autoTimeInAfter = employee.getCompanyShift().getAutoTimeInAfterHours();
+//
+//            LocalDateTime now = LocalDateTime.now();
+//            LocalDate today = now.toLocalDate();
+//
+//            LocalDateTime shiftStartDateTime = LocalDateTime.of(today, shiftStart);
+//            LocalDateTime shiftEndDateTime = LocalDateTime.of(today, shiftEnd);
+//
+//            // 🔥 Handle midnight crossing shift
+//            if (shiftEnd.isBefore(shiftStart)) {
+//
+//                if (now.toLocalTime().isBefore(shiftEnd)) {
+//                    shiftStartDateTime = shiftStartDateTime.minusDays(1);
+//                } else {
+//                    shiftEndDateTime = shiftEndDateTime.plusDays(1);
+//                }
+//            }
+//
+//            // ✅ Parse HH:mm safely
+//            Duration allowedDuration = Duration.ZERO;
+//
+//            if (autoTimeInAfter != null && !autoTimeInAfter.isEmpty()) {
+//
+//                String[] parts = autoTimeInAfter.split(":");
+//
+//                int hours = Integer.parseInt(parts[0]);
+//                int minutes = Integer.parseInt(parts[1]);
+//
+//                allowedDuration = Duration.ofHours(hours)
+//                        .plusMinutes(minutes);
+//            }
+//
+//            Duration gap = Duration.between(shiftEndDateTime, now);
+//
+//            UserInOut existing = userInOutRepository.getCurrentUserRecord(userId);
+//
+//            // ✅ BEFORE shift end
+//            if (gap.isNegative()) {
+//
+//                if (existing != null) {
+//                    updateUserInOut(existing.getId(), userId);
+//                    return "updated:" + employee.getUsername();
+//                } else {
+//                    createUserInOut(userId, locationId, companyId);
+//                    return "created:" + employee.getUsername();
+//                }
+//            }
+//
+//            // ✅ AFTER shift end but within allowed gap
+//            if (gap.compareTo(allowedDuration) <= 0) {
+//
+//                if (existing != null) {
+//                    updateUserInOut(existing.getId(), userId);
+//                    return "updated:" + employee.getUsername();
+//                } else {
+//                    createUserInOut(userId, locationId, companyId);
+//                    return "created:" + employee.getUsername();
+//                }
+//            }
+//
+//            // ❌ Gap exceeded → force new record
+//            createUserInOut(userId, locationId, companyId);
+//            return "created (gap exceeded):" + employee.getUsername();
+//
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            throw new RuntimeException(e);
+//        }
+//    }
+//
+//    @Override
+//    public UserInOutDto addClockInOut(UserInOutDto userInOutDto) {
+//        try {
+//            UserInOut userInOut = userInOutDto.getId() != null ? this.userInOutRepository.findById(userInOutDto.getId()).orElseThrow(() -> new RuntimeException("Clock in out not found")) : new UserInOut();
+//
+//            CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userInOutDto.getUserId())
+//                    .orElseThrow(() -> new RuntimeException("Employee not found"));
+//            CompanyDetails companyDetails = this.companyDetailsRepository.findById(userInOutDto.getCompanyId())
+//                    .orElseThrow(() -> new RuntimeException("Company not found"));
+//
+//            userInOut.setIsSalaryGenerate(0);
+//            userInOut.setUser(companyEmployee);
+//            userInOut.setCompanyDetails(companyDetails);
+//
+//            if (userInOutDto.getCreatedOn() == null) {
+//                userInOut.setCreatedOn(new Date());
+//            } else {
+//                userInOut.setCreatedOn(parseAnyDate(userInOutDto.getCreatedOn()));
+//            }
+//
+//            if (userInOutDto.getTimeIn() != null) {
+//                userInOut.setTimeIn(parseAnyDate(userInOutDto.getTimeIn()));
+//            } else {
+//                throw new RuntimeException("Clock In is required");
+//            }
+//
+//            if (userInOutDto.getTimeOut() != null) {
+//                userInOut.setTimeOut(parseAnyDate(userInOutDto.getTimeOut()));
+//            } else {
+//                userInOut.setTimeOut(null);
+//            }
+//
+//            this.userInOutRepository.save(userInOut);
+//            return userInOutDto;
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            throw new RuntimeException(e);
+//        }
+//    }
+
+    public UserInOutDto createUserInOut(int userId, Integer locationId, Integer companyId, Date timeIn) {
         try {
             UserInOut userInOut = new UserInOut();
             CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("Employee not found"));
             userInOut.setUser(companyEmployee);
-            CompanyDetails companyDetails = this.companyDetailsRepository.findById(companyId).orElseThrow(() -> new RuntimeException("Company not found"));
-
-            Date currentDate = new Date();
-            userInOut.setTimeIn(currentDate);
-            userInOut.setCreatedOn(currentDate);
+            CompanyDetails companyDetails = this.companyDetailsRepository.findById(companyId)
+                    .orElseThrow(() -> new RuntimeException("Company not found"));
+            userInOut.setTimeIn(timeIn);
+            userInOut.setCreatedOn(timeIn); // or new Date()? Use same timeIn for consistency
             userInOut.setCompanyDetails(companyDetails);
             userInOut.setIsSalaryGenerate(0);
-
-            if (locationId != null) {
-                Locations locations = this.locationsRepository.findById(locationId).orElseThrow(() -> new RuntimeException("Location not found"));
-                if (locations != null) {
-                    userInOut.setLocations(locations);
-                }
+            if (locationId != null && locationId > 0) {
+                Locations locations = this.locationsRepository.findById(locationId)
+                        .orElseThrow(() -> new RuntimeException("Location not found"));
+                userInOut.setLocations(locations);
             }
             this.userInOutRepository.save(userInOut);
             UserInOutDto res = new UserInOutDto();
@@ -243,15 +622,30 @@ public class UserInOutServiceImpl implements UserInOutService {
         }
     }
 
+    // Keep original for backward compatibility
+    public UserInOutDto createUserInOut(int userId, Integer locationId, Integer companyId) {
+        return createUserInOut(userId, locationId, companyId, new Date());
+    }
+
     public void updateUserInOut(Long id, int userId) {
         try {
-            UserInOut userInOut = this.userInOutRepository.getLastRecord(userId);
-            CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userId).orElseThrow(() -> new RuntimeException("Employee not found"));
-            userInOut.setUser(companyEmployee);
+            UserInOut userInOut = this.userInOutRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("UserInOut record not found"));
+            CompanyEmployee employee = this.companyEmployeeRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Employee not found"));
 
-            Date currentDate = new Date();
-            userInOut.setTimeOut(currentDate);
-            this.userInOutRepository.save(userInOut);
+            // Use current time as the intended timeOut
+            Date now = new Date();
+
+            // Delegate to common handler
+            boolean updated = handleTimeOutUpdate(employee, userInOut, now,
+                    userInOut.getLocations() != null ? userInOut.getLocations().getId() : null,
+                    employee.getCompanyDetails().getId());
+
+            if (!updated) {
+                // New record created, nothing else to do
+                return;
+            }
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e.getMessage());
@@ -262,37 +656,124 @@ public class UserInOutServiceImpl implements UserInOutService {
         try {
             UserInOut userInOut = this.userInOutRepository.findById(dto.getId())
                     .orElseThrow(() -> new RuntimeException("UserInOut record not found"));
-
-            CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(dto.getUserId())
+            CompanyEmployee employee = this.companyEmployeeRepository.findById(dto.getUserId())
                     .orElseThrow(() -> new RuntimeException("Employee not found"));
 
-            userInOut.setUser(companyEmployee);
+            // Parse timeOut from DTO
+            if (dto.getTimeOut() == null || dto.getTimeOut().isEmpty()) {
+                throw new RuntimeException("TimeOut is required for update");
+            }
+            OffsetDateTime odt = OffsetDateTime.parse(dto.getTimeOut());
+            Date timeOut = Date.from(odt.toInstant());
 
-            if (dto.getTimeIn() != null && !dto.getTimeIn().isEmpty()) {
-                try {
-                    OffsetDateTime odt = OffsetDateTime.parse(dto.getTimeIn());
-                    Date parsedTimeIn = Date.from(odt.toInstant());
-                    userInOut.setTimeIn(parsedTimeIn);
-                } catch (DateTimeParseException e) {
-                    e.printStackTrace();
-                    // Invalid format — skip
-                }
+            // Delegate to common handler
+            boolean updated = handleTimeOutUpdate(employee, userInOut, timeOut,
+                    dto.getLocationId(),
+                    employee.getCompanyDetails().getId());
+
+            if (!updated) {
+                // New record created, return original DTO (or maybe indicate?)
+                return dto;
             }
 
-            if (dto.getTimeOut() != null && !dto.getTimeOut().isEmpty()) {
-                try {
-                    OffsetDateTime odt = OffsetDateTime.parse(dto.getTimeOut());
-                    Date parsedTimeOut = Date.from(odt.toInstant());
-                    userInOut.setTimeOut(parsedTimeOut);
-                } catch (DateTimeParseException e) {
-                    e.printStackTrace();
-                }
-            }
-            this.userInOutRepository.save(userInOut);
+            // If updated, we might also want to reflect other changes? Currently only timeOut is set.
+            // The original code also set user (already set) but nothing else.
             return dto;
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e.getMessage());
+        }
+    }
+
+    @Override
+    public String clickInOut(int userId, Integer locationId, Integer companyId) {
+        try {
+            CompanyEmployee employee = companyEmployeeRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Employee not found"));
+
+            // Get current open record (timeOut null)
+            UserInOut existing = userInOutRepository.getCurrentUserRecord(userId);
+
+            if (existing != null) {
+                // There is an open record → attempt to clock out
+                updateUserInOut(existing.getId(), userId);
+                return "updated:" + employee.getUsername();
+            } else {
+                // No open record → clock in (create new with current time)
+                createUserInOut(userId, locationId, companyId, new Date());
+                return "created:" + employee.getUsername();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public UserInOutDto addClockInOut(UserInOutDto userInOutDto) {
+        try {
+            if (userInOutDto.getId() != null) {
+                // Update existing record
+                UserInOut userInOut = this.userInOutRepository.findById(userInOutDto.getId())
+                        .orElseThrow(() -> new RuntimeException("Clock in out not found"));
+                CompanyEmployee employee = this.companyEmployeeRepository.findById(userInOutDto.getUserId())
+                        .orElseThrow(() -> new RuntimeException("Employee not found"));
+
+                // If timeOut is provided, apply gap logic
+                if (userInOutDto.getTimeOut() != null) {
+                    Date timeOut = parseAnyDate(userInOutDto.getTimeOut());
+                    boolean updated = handleTimeOutUpdate(employee, userInOut, timeOut,
+                            userInOutDto.getLocationId(),
+                            userInOutDto.getCompanyId());
+                    if (!updated) {
+                        // New record created, return DTO as is
+                        return userInOutDto;
+                    }
+                }
+
+                // Also update timeIn if provided? (original code does this, but we keep it)
+                if (userInOutDto.getTimeIn() != null) {
+                    userInOut.setTimeIn(parseAnyDate(userInOutDto.getTimeIn()));
+                }
+                // Note: createdOn might also be updated in original, but we skip for brevity
+                userInOutRepository.save(userInOut);
+                return userInOutDto;
+            } else {
+                // Create new record (no gap check for creation)
+                UserInOut userInOut = new UserInOut();
+                CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userInOutDto.getUserId())
+                        .orElseThrow(() -> new RuntimeException("Employee not found"));
+                CompanyDetails companyDetails = this.companyDetailsRepository.findById(userInOutDto.getCompanyId())
+                        .orElseThrow(() -> new RuntimeException("Company not found"));
+
+                userInOut.setIsSalaryGenerate(0);
+                userInOut.setUser(companyEmployee);
+                userInOut.setCompanyDetails(companyDetails);
+
+                if (userInOutDto.getCreatedOn() == null) {
+                    userInOut.setCreatedOn(new Date());
+                } else {
+                    userInOut.setCreatedOn(parseAnyDate(userInOutDto.getCreatedOn()));
+                }
+
+                if (userInOutDto.getTimeIn() != null) {
+                    userInOut.setTimeIn(parseAnyDate(userInOutDto.getTimeIn()));
+                } else {
+                    throw new RuntimeException("Clock In is required");
+                }
+
+                if (userInOutDto.getTimeOut() != null) {
+                    userInOut.setTimeOut(parseAnyDate(userInOutDto.getTimeOut()));
+                } else {
+                    userInOut.setTimeOut(null);
+                }
+
+                this.userInOutRepository.save(userInOut);
+                return userInOutDto;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
         }
     }
 
@@ -498,123 +979,6 @@ public class UserInOutServiceImpl implements UserInOutService {
             e.printStackTrace();
         }
         return null;
-    }
-
-    @Override
-    public String clickInOut(int userId, Integer locationId, Integer companyId) {
-        try {
-            CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("Employee not found"));
-
-            Timestamp shiftEnd = companyEmployee.getCompanyShift().getEndTime();
-            Float autoTimeInAfterHours = companyEmployee.getCompanyShift().getAutoTimeInAfterHours();
-
-            Date currentTime = new Date();
-
-            // Convert shiftEnd to today’s date with same time
-            Calendar shiftCal = Calendar.getInstance();
-            shiftCal.setTime(shiftEnd);
-
-            Calendar currentCal = Calendar.getInstance();
-            currentCal.setTime(currentTime);
-
-            // Set shiftEnd date same as today
-            shiftCal.set(Calendar.YEAR, currentCal.get(Calendar.YEAR));
-            shiftCal.set(Calendar.MONTH, currentCal.get(Calendar.MONTH));
-            shiftCal.set(Calendar.DAY_OF_MONTH, currentCal.get(Calendar.DAY_OF_MONTH));
-
-            Date shiftEndToday = shiftCal.getTime();
-
-            // Calculate gap in milliseconds
-            long diffMillis = currentTime.getTime() - shiftEndToday.getTime();
-
-            if (diffMillis > 0) {
-
-                // Convert autoTimeInAfterHours to minutes properly
-                int hours = autoTimeInAfterHours.intValue();
-                int minutes = Math.round((autoTimeInAfterHours - hours) * 100);
-
-                long allowedMillis = (hours * 60L + minutes) * 60 * 1000;
-
-                if (diffMillis > allowedMillis) {
-                    this.createUserInOut(userId, locationId, companyId);
-                    return "created:" + companyEmployee.getUsername();
-                }
-            }
-
-            UserInOut isExisting = this.userInOutRepository.getCurrentUserRecord(userId);
-
-            if (isExisting != null) {
-                this.updateUserInOut(isExisting.getId(), userId);
-                return "updated:" + companyEmployee.getUsername();
-            } else {
-                this.createUserInOut(userId, locationId, companyId);
-                return "created:" + companyEmployee.getUsername();
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-    }
-
-
-    @Override
-    public UserInOutDto addClockInOut(UserInOutDto userInOutDto) {
-        try {
-            UserInOut userInOut = userInOutDto.getId() != null ? this.userInOutRepository.findById(userInOutDto.getId()).orElseThrow(() -> new RuntimeException("Clock in out not found")) : new UserInOut();
-
-            CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userInOutDto.getUserId())
-                    .orElseThrow(() -> new RuntimeException("Employee not found"));
-            CompanyDetails companyDetails = this.companyDetailsRepository.findById(userInOutDto.getCompanyId())
-                    .orElseThrow(() -> new RuntimeException("Company not found"));
-
-            userInOut.setIsSalaryGenerate(0);
-            userInOut.setUser(companyEmployee);
-            userInOut.setCompanyDetails(companyDetails);
-
-//            if (userInOutDto.getCreatedOn() == null) {
-//                userInOut.setCreatedOn(new Date());
-//            } else {
-//                userInOut.setCreatedOn(this.convertISOToDate(userInOutDto.getCreatedOn()));
-//            }
-//
-//            if (userInOutDto.getTimeIn() != null) {
-//                userInOut.setTimeIn(this.convertISOToDate(userInOutDto.getTimeIn()));
-//            } else {
-////                Date currentDate = new Date();
-////                userInOut.setTimeIn(currentDate);
-//                throw new RuntimeException("Clock In is required");
-//            }
-//            if (userInOutDto.getTimeOut() != null) {
-//                userInOut.setTimeOut(this.convertISOToDate(userInOutDto.getTimeOut()));
-//            } else {
-//                userInOut.setTimeOut(null);
-//            }
-            if (userInOutDto.getCreatedOn() == null) {
-                userInOut.setCreatedOn(new Date());
-            } else {
-                userInOut.setCreatedOn(parseAnyDate(userInOutDto.getCreatedOn()));
-            }
-
-            if (userInOutDto.getTimeIn() != null) {
-                userInOut.setTimeIn(parseAnyDate(userInOutDto.getTimeIn()));
-            } else {
-                throw new RuntimeException("Clock In is required");
-            }
-
-            if (userInOutDto.getTimeOut() != null) {
-                userInOut.setTimeOut(parseAnyDate(userInOutDto.getTimeOut()));
-            } else {
-                userInOut.setTimeOut(null);
-            }
-
-            this.userInOutRepository.save(userInOut);
-            return userInOutDto;
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
     }
 
     private Set<String> generateMonthKeys(Date startDate, Date endDate, SimpleDateFormat monthFormat) {
@@ -890,4 +1254,66 @@ public class UserInOutServiceImpl implements UserInOutService {
         }
     }
 
+    private boolean handleTimeOutUpdate(CompanyEmployee employee, UserInOut existingRecord,
+                                        Date timeOut, Integer locationId, Integer companyId) {
+
+        // 1️⃣ If shift type is not Hourly → always update (no gap logic)
+        String shiftType = employee.getCompanyShift().getShiftType();
+        if (shiftType.equals("Hourly")) {
+            // Hourly shift: just update the existing record
+            existingRecord.setTimeOut(timeOut);
+            userInOutRepository.save(existingRecord);
+            return true;
+        }
+
+        // 2️⃣ For Hourly shifts, check if autoTimeInAfter is present
+        String autoTimeInAfter = employee.getCompanyDetails().getAutoTimeInAfterHours();
+        if (autoTimeInAfter == null || autoTimeInAfter.isEmpty()) {
+            // No gap limit defined → just update
+            existingRecord.setTimeOut(timeOut);
+            userInOutRepository.save(existingRecord);
+            return true;
+        }
+
+        // 3️⃣ Gap logic for Hourly shifts with autoTimeInAfter
+        Instant timeOutInstant = timeOut.toInstant();
+        LocalDateTime timeOutUtc = LocalDateTime.ofInstant(timeOutInstant, ZoneOffset.UTC);
+
+        // Get shift start/end times (assumed stored as UTC timestamps, but treated as local time)
+        LocalTime shiftStart = employee.getCompanyShift().getStartTime().toLocalDateTime().toLocalTime();
+        LocalTime shiftEnd = employee.getCompanyShift().getEndTime().toLocalDateTime().toLocalTime();
+
+        LocalDate date = timeOutUtc.toLocalDate();
+        LocalDateTime shiftStartDateTime = LocalDateTime.of(date, shiftStart);
+        LocalDateTime shiftEndDateTime = LocalDateTime.of(date, shiftEnd);
+
+        // Handle shifts that cross midnight
+        if (shiftEnd.isBefore(shiftStart)) {
+            if (timeOutUtc.toLocalTime().isBefore(shiftEnd)) {
+                shiftStartDateTime = shiftStartDateTime.minusDays(1);
+            } else {
+                shiftEndDateTime = shiftEndDateTime.plusDays(1);
+            }
+        }
+
+        // Parse allowed gap duration from autoTimeInAfter (format "HH:mm")
+        String[] parts = autoTimeInAfter.split(":");
+        int hours = Integer.parseInt(parts[0]);
+        int minutes = Integer.parseInt(parts[1]);
+        Duration allowedDuration = Duration.ofHours(hours).plusMinutes(minutes);
+
+        Duration gap = Duration.between(shiftEndDateTime, timeOutUtc);
+
+        if (!gap.isNegative() && gap.compareTo(allowedDuration) > 0) {
+            // Gap exceeded → create new record for next day with timeIn = timeOut + 1 day
+            Date nextDayTimeIn = Date.from(timeOutInstant.plusSeconds(24 * 60 * 60));
+            createUserInOut(employee.getEmployeeId(), locationId, companyId, nextDayTimeIn);
+            return false; // existing record not updated
+        } else {
+            // Within allowed gap → update existing record
+            existingRecord.setTimeOut(timeOut);
+            userInOutRepository.save(existingRecord);
+            return true;
+        }
+    }
 }

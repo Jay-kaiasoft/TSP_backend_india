@@ -189,7 +189,8 @@ public class CompanyDetailsServiceImpl implements CompanyDetailsService {
                 companyDetails.setIsActive(1);
                 Date currentDate = new Date();
                 companyDetails.setRegisterDate(currentDate);
-                BeanUtils.copyProperties(companyDetailsDto, companyDetails);
+                companyDetails.setAutoTimeInAfterHours("20:00");
+                BeanUtils.copyProperties(companyDetailsDto, companyDetails, "autoTimeInAfterHours");
                 this.companyDetailsRepository.save(companyDetails);
                 companyDetailsDto.setId(companyDetails.getId());
 
@@ -362,6 +363,28 @@ public class CompanyDetailsServiceImpl implements CompanyDetailsService {
                 return companyDetails.getCompanyNo();
             }
             return null;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void updateAutoTimeInAfterHours(Integer companyId, String data) {
+        try {
+            CompanyDetails companyDetails = this.companyDetailsRepository.findById(companyId).orElseThrow(() -> new RuntimeException("Company not found"));
+            companyDetails.setAutoTimeInAfterHours(data);
+            this.companyDetailsRepository.save(companyDetails);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public String getAutoTimeInAfterHours(Integer companyId) {
+        try {
+            CompanyDetails companyDetails = this.companyDetailsRepository.findById(companyId).orElseThrow(() -> new RuntimeException("Company not found"));
+            return companyDetails.getAutoTimeInAfterHours();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

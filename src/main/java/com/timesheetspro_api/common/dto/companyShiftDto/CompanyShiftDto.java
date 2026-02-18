@@ -14,5 +14,4 @@ public class CompanyShiftDto {
     private Timestamp endTime;
     private Float hours;
     private Float totalHours;
-    private Float autoTimeInAfterHours;
 }
