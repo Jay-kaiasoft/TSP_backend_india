@@ -34,4 +34,6 @@ public interface UserInOutService {
 
     UserInOutDto addClockInOut(UserInOutDto userInOutDto);
 
+    void deleteUserInOut(Long id);
+
 }

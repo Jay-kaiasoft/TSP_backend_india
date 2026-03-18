@@ -133,7 +133,7 @@ public class UserInOutServiceImpl implements UserInOutService {
             spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(end));
 
             List<UserInOut> userInOutList =
-                    this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "id"));
+                    this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
             List<UserInOutDto> userInOutDtoList = userInOutList.stream()
                     .map(userInOut -> {
                         UserInOutDto dto = new UserInOutDto();
@@ -710,6 +710,17 @@ public class UserInOutServiceImpl implements UserInOutService {
     }
 
     @Override
+    public void deleteUserInOut(Long id) {
+        try {
+            UserInOut userInOut = this.userInOutRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("UserInOut record not found"));
+            this.userInOutRepository.delete(userInOut);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
     public UserInOutDto addClockInOut(UserInOutDto userInOutDto) {
         try {
             if (userInOutDto.getId() != null) {
@@ -1257,15 +1268,6 @@ public class UserInOutServiceImpl implements UserInOutService {
     private boolean handleTimeOutUpdate(CompanyEmployee employee, UserInOut existingRecord,
                                         Date timeOut, Integer locationId, Integer companyId) {
 
-        // 1️⃣ If shift type is not Hourly → always update (no gap logic)
-        String shiftType = employee.getCompanyShift().getShiftType();
-        if (shiftType.equals("Hourly")) {
-            // Hourly shift: just update the existing record
-            existingRecord.setTimeOut(timeOut);
-            userInOutRepository.save(existingRecord);
-            return true;
-        }
-
         // 2️⃣ For Hourly shifts, check if autoTimeInAfter is present
         String autoTimeInAfter = employee.getCompanyDetails().getAutoTimeInAfterHours();
         if (autoTimeInAfter == null || autoTimeInAfter.isEmpty()) {
@@ -1308,7 +1310,7 @@ public class UserInOutServiceImpl implements UserInOutService {
             // Gap exceeded → create new record for next day with timeIn = timeOut + 1 day
             Date nextDayTimeIn = Date.from(timeOutInstant.plusSeconds(24 * 60 * 60));
             createUserInOut(employee.getEmployeeId(), locationId, companyId, nextDayTimeIn);
-            return false; // existing record not updated
+            return true; // existing record not updated
         } else {
             // Within allowed gap → update existing record
             existingRecord.setTimeOut(timeOut);

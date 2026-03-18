@@ -247,4 +247,15 @@ public class UserInOutController {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to create userInOut", resBody);
         }
     }
+
+    @DeleteMapping("/delete/{id}")
+    public ApiResponse<?> deleteUserInOut(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @PathVariable String id) {
+        Map<String, Object> resBody = new HashMap<>();
+        try {
+            this.userInOutService.deleteUserInOut(Long.parseLong(id));
+            return new ApiResponse<>(HttpStatus.OK.value(), "UserInOut deleted successfully", "");
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to delete userInOut record", resBody);
+        }
+    }
 }

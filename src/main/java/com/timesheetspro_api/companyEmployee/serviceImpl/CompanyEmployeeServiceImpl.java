@@ -3,6 +3,7 @@ package com.timesheetspro_api.companyEmployee.serviceImpl;
 import com.timesheetspro_api.common.dto.CompanyEmployeeDto.CompanyEmployeeDto;
 import com.timesheetspro_api.common.dto.CompanyEmployeeDto.EmployeeDto;
 import com.timesheetspro_api.common.dto.CompanyEmployeeRoles.CompanyEmployeeRolesDto;
+import com.timesheetspro_api.common.dto.companyShiftDto.CompanyShiftDto;
 import com.timesheetspro_api.common.exception.GlobalException;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.UserInOut.UserInOut;
@@ -34,6 +35,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 
 import java.io.File;
@@ -110,8 +112,17 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                 if (employee == null) continue;
 
                 int empId = employee.getEmployeeId();
-                LocalDate workDate = ((java.sql.Date) userInOut.getCreatedOn()).toLocalDate();
-                employeeWorkDays.computeIfAbsent(empId, k -> new HashSet<>()).add(workDate);
+                java.util.Date createdOn = userInOut.getCreatedOn();
+                if (createdOn != null) {
+                    LocalDate workDate = createdOn.toInstant()
+                            .atZone(ZoneId.systemDefault()) // or ZoneOffset.UTC
+                            .toLocalDate();
+                    // use workDate
+                    employeeWorkDays.computeIfAbsent(empId, k -> new HashSet<>()).add(workDate);
+                }
+//                LocalDate workDate = ((java.sql.Date) userInOut.getCreatedOn()).toLocalDate();
+//                employeeWorkDays.computeIfAbsent(empId, k -> new HashSet<>()).add(workDate);
+
             }
             for (Map.Entry<Integer, Set<LocalDate>> entry : employeeWorkDays.entrySet()) {
                 Integer empId = entry.getKey();
@@ -123,8 +134,8 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                         Map<String, Object> map = new HashMap<>();
                         map.put("employeeId", empId);
                         map.put("userName", emp.getFirstName() + " " + emp.getLastName());
-                        map.put("daysWorked", daysWorked);
-                        map.put("totalDays", totalDays);
+//                        map.put("daysWorked", daysWorked);
+//                        map.put("totalDays", totalDays);
                         map.put("pf_type", emp.getPfType());
 
                         if ("Percentage".equals(emp.getPfType())) {
@@ -149,18 +160,18 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                             Integer totalBasicSalary = emp.getBasicSalary() * month;
 
                             BigDecimal monthlyPfAmount = BigDecimal.valueOf(emp.getPfAmount());
-                            BigDecimal totalPfAmountForMonths = monthlyPfAmount.multiply(BigDecimal.valueOf(month));
-
-                            BigDecimal perDayPf = totalPfAmountForMonths
-                                    .divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
-
-                            BigDecimal pfAmount = perDayPf.multiply(BigDecimal.valueOf(daysWorked)).setScale(0, RoundingMode.HALF_UP); // Round final amount
+//                            BigDecimal totalPfAmountForMonths = monthlyPfAmount.multiply(BigDecimal.valueOf(month));
+//
+//                            BigDecimal perDayPf = totalPfAmountForMonths
+//                                    .divide(BigDecimal.valueOf(totalDays), 2, RoundingMode.HALF_UP);
+//
+//                            BigDecimal pfAmount = perDayPf.multiply(BigDecimal.valueOf(daysWorked)).setScale(0, RoundingMode.HALF_UP); // Round final amount
 
                             map.put("basic_salary", emp.getBasicSalary());
                             map.put("total_basic_salary", totalBasicSalary);
-                            map.put("employee_pf_amount", pfAmount);
-                            map.put("employer_pf_amount", pfAmount);
-                            map.put("total_amount", pfAmount.multiply(BigDecimal.valueOf(2)));
+                            map.put("employee_pf_amount", monthlyPfAmount);
+                            map.put("employer_pf_amount", monthlyPfAmount);
+                            map.put("total_amount", monthlyPfAmount.multiply(BigDecimal.valueOf(2)));
                             map.put("pf_amount", emp.getPfAmount());
                         }
                         response.add(map);
@@ -240,7 +251,11 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
             companyEmployeeDto.setCompanyId(companyEmployee.getCompanyDetails().getId());
 
             if (companyEmployee.getCompanyShift() != null) {
+                CompanyShiftDto companyShiftDto = new CompanyShiftDto();
+                CompanyShift companyShift = this.companyShiftRepository.findById(companyEmployee.getCompanyShift().getId()).orElseThrow(() -> new RuntimeException("Shift not found"));
                 companyEmployeeDto.setShiftId(companyEmployee.getCompanyShift().getId());
+                BeanUtils.copyProperties(companyShift, companyShiftDto);
+                companyEmployeeDto.setCompanyShiftDto(companyShiftDto);
             }
 
             if (companyEmployee.getDepartment() != null) {
