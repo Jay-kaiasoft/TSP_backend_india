@@ -121,6 +121,18 @@ public class UserInOutController {
         }
     }
 
+    @GetMapping("/getAllRecordsGroupByUser")
+    public ApiResponse<?> getAllEntriesGroupByUser(@RequestHeader(value = "Authorization", required = false) String authorizationHeader, @RequestParam(value = "userIds", required = false) List<Integer> userIds, @RequestParam(value = "startDate", required = false) String startDate, @RequestParam(value = "endDate", required = false) String endDate, @RequestParam(value = "timeZone", required = false) String timeZone, @RequestParam(value = "locationIds", required = false) List<Integer> locationIds, @RequestParam(value = "departmentIds", required = false) List<Integer> departmentIds, @RequestParam(value = "companyId", required = false) Integer companyId) {
+        Map<String, Object> resBody = new HashMap<>();
+        try {
+            String token = authorizationHeader.substring(7);
+            Long userId = jwtService.extractUserId(token);
+            return new ApiResponse<>(HttpStatus.OK.value(), "UserInOut fetched successfully", this.userInOutService.getAllEntriesGroupByUser(userIds, startDate, endDate, timeZone, locationIds, departmentIds, companyId));
+        } catch (Exception e) {
+            return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to get userInOut", resBody);
+        }
+    }
+
     @GetMapping("/todayrecords")
     public ApiResponse<?> getTodayEntries(@RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
         Map<String, Object> resBody = new HashMap<>();

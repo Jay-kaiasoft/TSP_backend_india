@@ -240,8 +240,8 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         } else {
             dto.setPfAmount(companyEmployee.getPfAmount());
         }
-        dto.setTotalPfAmount(pfAmount > 900 ? 900 : pfAmount);
-        pfAmount = pfAmount > 900 ? 900 : pfAmount;
+        dto.setTotalPfAmount(pfAmount > 1800 ? 1800 : pfAmount);
+        pfAmount = pfAmount > 1800 ? 1800 : pfAmount;
 
         // Calculate PT
         int ptAmount = Boolean.TRUE.equals(companyEmployee.getIsPt()) ? companyEmployee.getPtAmount() : 0;

@@ -2,19 +2,20 @@ package com.timesheetspro_api.userInOut.serviceImpl;
 
 import com.timesheetspro_api.common.dto.UserInOut.UserInOutDto;
 import com.timesheetspro_api.common.dto.companyShiftDto.CompanyShiftDto;
+import com.timesheetspro_api.common.dto.holidayTemplateDetails.HolidayTemplateDetailsDto;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.UserInOut.UserInOut;
 import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
 import com.timesheetspro_api.common.model.companyShift.CompanyShift;
+import com.timesheetspro_api.common.model.holidayTemplates.HolidayTemplates;
 import com.timesheetspro_api.common.model.locations.Locations;
+import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
 import com.timesheetspro_api.common.repository.UserInOutRepository;
 import com.timesheetspro_api.common.repository.UserRepository;
-import com.timesheetspro_api.common.repository.company.CompanyDetailsRepository;
-import com.timesheetspro_api.common.repository.company.CompanyEmployeeRepository;
-import com.timesheetspro_api.common.repository.company.CompanyShiftRepository;
-import com.timesheetspro_api.common.repository.company.LocationsRepository;
+import com.timesheetspro_api.common.repository.company.*;
 import com.timesheetspro_api.common.service.CommonService;
 import com.timesheetspro_api.common.specification.UserInOutSpecification;
+import com.timesheetspro_api.holidayTemplateDetails.service.HolidayTemplateDetailsService;
 import com.timesheetspro_api.userInOut.service.UserInOutService;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.RegionUtil;
@@ -30,6 +31,7 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -63,6 +65,15 @@ public class UserInOutServiceImpl implements UserInOutService {
 
     @Autowired
     private CompanyDetailsRepository companyDetailsRepository;
+
+    @Autowired
+    private WeeklyOffRepository weeklyOffRepository;
+
+    @Autowired
+    private HolidayTemplatesRepository holidayTemplatesRepository;
+
+    @Autowired
+    private HolidayTemplateDetailsService holidayTemplateDetailsService;
 
     @Override
     public Map<String, Object> dashboardCounts(int companyId) {
@@ -98,8 +109,214 @@ public class UserInOutServiceImpl implements UserInOutService {
     }
 
     @Override
+    public Map<String, Object> getAllEntriesGroupByUser(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds, Integer companyId) {
+        try {
+            // --- Date handling: obtain UTC Date objects and corresponding local dates ---
+            Date startUTC, endUTC;
+            LocalDate startLocal, endLocal;
+
+            if (startDate == null || endDate == null) {
+                // Default to current month in UTC
+                Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+                calendar.set(Calendar.DAY_OF_MONTH, 1);
+                startUTC = calendar.getTime();
+                calendar.add(Calendar.MONTH, 1);
+                calendar.set(Calendar.DAY_OF_MONTH, 0);
+                endUTC = new Date(); // Current time
+
+                // Convert UTC dates to local dates using the given time zone
+                startLocal = startUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
+                endLocal = endUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
+            } else {
+                // Use commonService to convert input strings to UTC Date (handles any extra characters)
+                startUTC = this.commonService.convertLocalToUtc(startDate, timeZone, false);
+                endUTC = this.commonService.convertLocalToUtc(endDate, timeZone, true);
+
+                // Derive local dates from the UTC results
+                startLocal = startUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
+                endLocal = endUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
+            }
+
+            // --- Build specification with filters (unchanged) ---
+            Specification<UserInOut> spec = UserInOutSpecification.createdOnGreaterThanEqual(startUTC);
+            if (userIds != null && !userIds.isEmpty()) {
+                spec = spec.and(UserInOutSpecification.userIdIn(userIds));
+            }
+            if (locationIds != null && !locationIds.isEmpty()) {
+                spec = spec.and(UserInOutSpecification.hasLocationId(locationIds));
+            }
+            if (departmentIds != null && !departmentIds.isEmpty()) {
+                spec = spec.and(UserInOutSpecification.hasDepartmentIds(departmentIds));
+            }
+            if (companyId != null) {
+                spec = spec.and(UserInOutSpecification.hasCompany(companyId));
+            }
+            spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(endUTC));
+
+            // --- Fetch data from repository ---
+            List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
+
+            // --- Group by User entity ---
+            Map<CompanyEmployee, List<UserInOut>> groupedByUser = userInOutList.stream()
+                    .collect(Collectors.groupingBy(UserInOut::getUser));
+
+            // --- Build the list of all dates in the range (inclusive) ---
+            List<LocalDate> dateRange = startLocal.datesUntil(endLocal.plusDays(1)).collect(Collectors.toList());
+            // --- Prepare response ---
+            List<Map<String, Object>> userGroups = new ArrayList<>();
+
+            for (Map.Entry<CompanyEmployee, List<UserInOut>> entry : groupedByUser.entrySet()) {
+                CompanyEmployee user = entry.getKey();
+                List<UserInOut> entries = entry.getValue();
+
+                // --- Pre‑fetch shift data for this user (cached per user) ---
+                int regularMinutes = 0;
+                int breakMinutes = 0;
+                if (user.getCompanyShift() != null) {
+                    CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(user.getEmployeeId())
+                            .orElseThrow(() -> new RuntimeException("Employee not found"));
+                    if (companyEmployee.getCompanyShift() != null) {
+                        CompanyShift companyShift = this.companyShiftRepository.findById(companyEmployee.getCompanyShift().getId())
+                                .orElseThrow(() -> new RuntimeException("Shift not found"));
+                        Float regularHours = companyShift.getTotalHours();
+                        regularMinutes = regularHours != null ? Math.round(regularHours * 60) : 0;
+                        breakMinutes = user.getLunchBreak() != null ? user.getLunchBreak() : 0;
+                    }
+                }
+
+                // --- Map each entry to its local date (for quick lookup) ---
+                Map<LocalDate, UserInOut> entryByDate = new HashMap<>();
+                for (UserInOut uio : entries) {
+                    LocalDate date = uio.getCreatedOn().toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
+                    entryByDate.put(date, uio);
+                }
+
+                // --- Pre-fetch Holidays (Do this BEFORE the dateRange loop) ---
+                List<String> holidayDates = new ArrayList<>();
+                List<HolidayTemplates> holidayTemplates = this.holidayTemplatesRepository.findByCompanyId(user.getCompanyDetails().getId());
+
+                if (holidayTemplates != null && !holidayTemplates.isEmpty()) {
+                    for (HolidayTemplates template : holidayTemplates) {
+                        List<HolidayTemplateDetailsDto> dtoList = this.holidayTemplateDetailsService.getAllHolidayTemplateDetailsByTemplateId(template.getId());
+                        if (dtoList != null && !dtoList.isEmpty()) {
+                            for (HolidayTemplateDetailsDto dto : dtoList) {
+                                System.out.println("dto date: " + dto.getDate());
+
+                                // Assuming dto.getDate() returns "18/03/2026, 12:00:00 AM"
+                                // Extract just the "18/03/2026" part for easy matching
+                                if (dto.getDate() != null && dto.getDate().length() >= 10) {
+                                    holidayDates.add(dto.getDate().substring(0, 10));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                WeeklyOff weeklyOff = user.getWeeklyOff();
+
+                // --- Build the "data" array for all dates in the range ---
+                List<Map<String, Object>> dataList = new ArrayList<>();
+                int totalGrossMinutes = 0;
+                int totalOvertimeMinutes = 0;
+                int rowIndex = 1;
+
+                for (LocalDate date : dateRange) {
+                    UserInOut uio = entryByDate.get(date);
+                    Map<String, Object> dataItem = new HashMap<>();
+
+                    // 1. Determine if today is a Holiday or a Weekly Off
+                    boolean isOffDay = false;
+                    String formattedCurrentDate = date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
+                    // Check if the current date is in our pre-fetched holidays list
+                    if (holidayDates.contains(formattedCurrentDate)) {
+                        isOffDay = true;
+                    }
+
+                    // Check if the current date falls under the Weekly Off rules
+                    if (!isOffDay && weeklyOff != null) {
+                        DayOfWeek dayOfWeek = date.getDayOfWeek();
+                        int weekOfMonth = ((date.getDayOfMonth() - 1) / 7) + 1; // Returns 1, 2, 3, 4, or 5
+                        isOffDay = isWeeklyOffDay(dayOfWeek, weekOfMonth, weeklyOff);
+                    }
+
+                    if (uio != null && uio.getTimeIn() != null && uio.getTimeOut() != null) {
+                        // --- Present day with valid times ---
+                        Date timeIn = uio.getTimeIn();
+                        Date timeOut = uio.getTimeOut();
+                        long diffMs = timeOut.getTime() - timeIn.getTime();
+                        int grossMinutes = (int) (diffMs / (60 * 1000));
+                        int netMinutes = grossMinutes - breakMinutes;
+                        int overtimeMinutes = Math.max(0, grossMinutes - regularMinutes - breakMinutes);
+
+                        totalGrossMinutes += grossMinutes;
+                        totalOvertimeMinutes += overtimeMinutes;
+
+                        dataItem.put("id", uio.getId());
+                        dataItem.put("timeIn", this.commonService.convertDateToString(timeIn));
+                        dataItem.put("timeOut", this.commonService.convertDateToString(timeOut));
+                        dataItem.put("createdOn", this.commonService.convertDateToString(uio.getCreatedOn()));
+                        dataItem.put("locationId", uio.getLocations() != null ? uio.getLocations().getId() : null);
+                        dataItem.put("regular", formatMinutesToHHmm(regularMinutes));
+                        dataItem.put("breakTime", formatMinutesToHHmm(breakMinutes));
+                        dataItem.put("workHours", formatMinutesToHHmm(netMinutes));
+                        dataItem.put("overtime", formatMinutesToHHmm(overtimeMinutes));
+                        dataItem.put("totalHours", formatMinutesToHHmm(grossMinutes));
+
+                        // If it's an off day and they worked = "PW" (Present on Weekly Off/Holiday)
+                        // If it's a normal day and they worked = "P" (Present)
+                        dataItem.put("status", isOffDay ? "PW" : "P");
+                        dataItem.put("userName", user.getFirstName() + " " + user.getLastName());
+                    } else {
+                        // --- Absent or incomplete day ---
+                        ZonedDateTime zdt = date.atStartOfDay(ZoneId.of(timeZone));
+                        Date createdOnDate = Date.from(zdt.toInstant());
+
+                        dataItem.put("id", null);
+                        dataItem.put("timeIn", null);
+                        dataItem.put("timeOut", null);
+                        dataItem.put("createdOn", this.commonService.convertDateToString(createdOnDate));
+                        dataItem.put("locationId", null);
+                        dataItem.put("regular", formatMinutesToHHmm(regularMinutes));
+                        dataItem.put("breakTime", formatMinutesToHHmm(breakMinutes));
+                        dataItem.put("workHours", "00:00");
+                        dataItem.put("overtime", "00:00");
+                        dataItem.put("totalHours", "00:00");
+
+                        // If it's an off day and they didn't work = "W" (Weekly Off/Holiday)
+                        // If it's a normal day and they didn't work = "A" (Absent)
+                        dataItem.put("status", isOffDay ? "W" : "A");
+                        dataItem.put("userName", user.getFirstName() + " " + user.getLastName());
+                    }
+                    dataItem.put("rowId", rowIndex++);
+                    dataList.add(dataItem);
+                }
+                // --- Build user group object with totals ---
+                Map<String, Object> userGroup = new HashMap<>();
+                userGroup.put("id", user.getEmployeeId());
+                userGroup.put("username", user.getUsername());
+                userGroup.put("department", user.getDepartment().getDepartmentName());
+                userGroup.put("data", dataList);
+                userGroup.put("totalHours", formatMinutesToHHmm(totalGrossMinutes));
+                userGroup.put("totalOvertime", formatMinutesToHHmm(totalOvertimeMinutes));
+                userGroups.add(userGroup);
+            }
+
+            // --- Wrap the array in a Map to satisfy the return type ---
+            Map<String, Object> result = new HashMap<>();
+            result.put("users", userGroups);
+            return result;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e.getMessage());
+        }
+    }
+
+    @Override
     public List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds, Integer companyId) {
         try {
+            // --- Date handling ---
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
             dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
 
@@ -116,6 +333,7 @@ public class UserInOutServiceImpl implements UserInOutService {
                 end = this.commonService.convertLocalToUtc(endDate, timeZone, true);
             }
 
+            // --- Build specification ---
             Specification<UserInOut> spec = UserInOutSpecification.createdOnGreaterThanEqual(start);
             if (userIds != null && !userIds.isEmpty()) {
                 spec = spec.and(UserInOutSpecification.userIdIn(userIds));
@@ -129,11 +347,34 @@ public class UserInOutServiceImpl implements UserInOutService {
             if (companyId != null) {
                 spec = spec.and(UserInOutSpecification.hasCompany(companyId));
             }
-
             spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(end));
 
-            List<UserInOut> userInOutList =
-                    this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
+            // --- Fetch raw entries ---
+            List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
+
+            // --- Collect distinct user IDs from the entries ---
+            Set<Integer> distinctUserIds = userInOutList.stream()
+                    .map(uio -> uio.getUser().getEmployeeId())
+                    .collect(Collectors.toSet());
+
+            // --- Pre‑fetch all employees (and their shift & lunch break) in one query ---
+            Map<Integer, EmployeeData> employeeDataMap = new HashMap<>();
+            if (!distinctUserIds.isEmpty()) {
+                List<CompanyEmployee> employees = companyEmployeeRepository.findAllById(distinctUserIds);
+                for (CompanyEmployee emp : employees) {
+                    int regMinutes = 0;
+                    int breakMinutes = emp.getLunchBreak() != null ? emp.getLunchBreak() : 0;
+                    if (emp.getCompanyShift() != null) {
+                        CompanyShift shift = emp.getCompanyShift();
+                        // totalHours is stored as Float (e.g., 8.5 for 8h30m)
+                        Float regHours = shift.getTotalHours();
+                        regMinutes = regHours != null ? Math.round(regHours * 60) : 0;
+                    }
+                    employeeDataMap.put(emp.getEmployeeId(), new EmployeeData(regMinutes, breakMinutes));
+                }
+            }
+
+            // --- Map each entry to DTO with computed fields ---
             List<UserInOutDto> userInOutDtoList = userInOutList.stream()
                     .map(userInOut -> {
                         UserInOutDto dto = new UserInOutDto();
@@ -151,14 +392,48 @@ public class UserInOutServiceImpl implements UserInOutService {
                             dto.setLocationId(userInOut.getLocations().getId());
                         }
                         dto.setUserId(userInOut.getUser().getEmployeeId());
+
+                        // --- Shift DTO (unchanged) ---
                         CompanyShiftDto companyShiftDto = new CompanyShiftDto();
-                        CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userInOut.getUser().getEmployeeId()).orElseThrow(() -> new RuntimeException("Employee not found"));
+                        CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userInOut.getUser().getEmployeeId())
+                                .orElseThrow(() -> new RuntimeException("Employee not found"));
                         if (companyEmployee.getCompanyShift() != null) {
-                            CompanyShift companyShift = this.companyShiftRepository.findById(companyEmployee.getCompanyShift().getId()).orElseThrow(() -> new RuntimeException("Shift not found"));
+                            CompanyShift companyShift = this.companyShiftRepository.findById(companyEmployee.getCompanyShift().getId())
+                                    .orElseThrow(() -> new RuntimeException("Shift not found"));
                             companyShiftDto.setCompanyId(companyShift.getCompanyDetails().getId());
                             BeanUtils.copyProperties(companyShift, companyShiftDto);
                             dto.setCompanyShiftDto(companyShiftDto);
                         }
+
+                        // --- Compute additional fields using pre‑fetched data ---
+                        EmployeeData empData = employeeDataMap.get(userInOut.getUser().getEmployeeId());
+                        int regularMinutes = empData != null ? empData.regularMinutes : 0;
+                        int breakMinutes = empData != null ? empData.breakMinutes : 0;
+
+                        if (userInOut.getTimeIn() != null && userInOut.getTimeOut() != null) {
+                            long diffMs = userInOut.getTimeOut().getTime() - userInOut.getTimeIn().getTime();
+                            int grossMinutes = (int) (diffMs / (60 * 1000));
+                            int workMinutes = grossMinutes - breakMinutes;
+                            int overtimeMinutes = Math.max(0, grossMinutes - regularMinutes - breakMinutes);
+
+                            dto.setRegular(formatMinutesToHHmm(regularMinutes));
+                            dto.setBreakTime(formatMinutesToHHmm(breakMinutes));
+                            dto.setWorkHours(formatMinutesToHHmm(workMinutes));
+                            dto.setOvertime(formatMinutesToHHmm(overtimeMinutes));
+                            dto.setTotalHours(formatMinutesToHHmm(grossMinutes));
+                            dto.setStatus("P");
+                            dto.setDepartment(userInOut.getUser().getDepartment().getDepartmentName());
+                        } else {
+                            // Incomplete entry (e.g., only clock‑in, no clock‑out)
+                            dto.setRegular(formatMinutesToHHmm(regularMinutes));
+                            dto.setBreakTime(formatMinutesToHHmm(breakMinutes));
+                            dto.setWorkHours("00:00");
+                            dto.setOvertime("00:00");
+                            dto.setTotalHours("00:00");
+                            dto.setStatus("A"); // I = incomplete
+                            dto.setDepartment(userInOut.getUser().getDepartment().getDepartmentName());
+                        }
+
                         return dto;
                     })
                     .collect(Collectors.toList());
@@ -168,6 +443,24 @@ public class UserInOutServiceImpl implements UserInOutService {
             e.printStackTrace();
             throw new RuntimeException(e.getMessage());
         }
+    }
+
+    // Helper inner class to hold pre‑fetched data
+    private static class EmployeeData {
+        int regularMinutes;
+        int breakMinutes;
+
+        EmployeeData(int regularMinutes, int breakMinutes) {
+            this.regularMinutes = regularMinutes;
+            this.breakMinutes = breakMinutes;
+        }
+    }
+
+    // Helper method (already used in groupBy)
+    private String formatMinutesToHHmm(int minutes) {
+        int hours = minutes / 60;
+        int mins = minutes % 60;
+        return String.format("%02d:%02d", hours, mins);
     }
 
     @Override
@@ -211,389 +504,6 @@ public class UserInOutServiceImpl implements UserInOutService {
             throw new RuntimeException(e.getMessage());
         }
     }
-
-//    public UserInOutDto createUserInOut(int userId, Integer locationId, Integer companyId) {
-//        try {
-//            UserInOut userInOut = new UserInOut();
-//            CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userId).orElseThrow(() -> new RuntimeException("Employee not found"));
-//            userInOut.setUser(companyEmployee);
-//            CompanyDetails companyDetails = this.companyDetailsRepository.findById(companyId).orElseThrow(() -> new RuntimeException("Company not found"));
-//            Date currentDate = new Date();
-//            userInOut.setTimeIn(currentDate);
-//            userInOut.setCreatedOn(currentDate);
-//            userInOut.setCompanyDetails(companyDetails);
-//            userInOut.setIsSalaryGenerate(0);
-//            if (locationId != null && locationId > 0) {
-//                Locations locations = this.locationsRepository.findById(locationId).orElseThrow(() -> new RuntimeException("Location not found"));
-//                if (locations != null) {
-//                    userInOut.setLocations(locations);
-//                }
-//            }
-//            this.userInOutRepository.save(userInOut);
-//            UserInOutDto res = new UserInOutDto();
-//            res.setId(userInOut.getId());
-//            return res;
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            throw new RuntimeException(e.getMessage());
-//        }
-//    }
-//
-//    public void updateUserInOut(Long id, int userId) {
-//
-//        try {
-//
-//            UserInOut userInOut = this.userInOutRepository.getLastRecord(userId);
-//
-//            if (userInOut == null) {
-//                throw new RuntimeException("No existing record found");
-//            }
-//
-//            CompanyEmployee employee = this.companyEmployeeRepository
-//                    .findById(userId)
-//                    .orElseThrow(() -> new RuntimeException("Employee not found"));
-//
-//            userInOut.setUser(employee);
-//
-//            // ===============================
-//            // 1️⃣ Current UTC time
-//            // ===============================
-//
-//            Instant nowInstant = Instant.now();
-//            LocalDateTime nowUtc =
-//                    LocalDateTime.ofInstant(nowInstant, ZoneOffset.UTC);
-//
-//            // ===============================
-//            // 2️⃣ Get shift times (LOCAL)
-//            // ===============================
-//
-//            LocalTime shiftStart = employee.getCompanyShift()
-//                    .getStartTime()
-//                    .toLocalDateTime()
-//                    .toLocalTime();
-//
-//            LocalTime shiftEnd = employee.getCompanyShift()
-//                    .getEndTime()
-//                    .toLocalDateTime()
-//                    .toLocalTime();
-//
-//            String autoTimeInAfter =
-//                    employee.getCompanyShift().getAutoTimeInAfterHours();
-//
-//            LocalDate today = nowUtc.toLocalDate();
-//
-//            LocalDateTime shiftStartDateTime =
-//                    LocalDateTime.of(today, shiftStart);
-//
-//            LocalDateTime shiftEndDateTime =
-//                    LocalDateTime.of(today, shiftEnd);
-//
-//            // ===============================
-//            // 3️⃣ Handle midnight shift
-//            // ===============================
-//
-//            if (shiftEnd.isBefore(shiftStart)) {
-//
-//                if (nowUtc.toLocalTime().isBefore(shiftEnd)) {
-//                    shiftStartDateTime = shiftStartDateTime.minusDays(1);
-//                } else {
-//                    shiftEndDateTime = shiftEndDateTime.plusDays(1);
-//                }
-//            }
-//
-//            // ===============================
-//            // 4️⃣ Parse allowed gap (HH:mm)
-//            // ===============================
-//
-//            Duration allowedDuration = Duration.ZERO;
-//
-//            if (autoTimeInAfter != null && !autoTimeInAfter.isEmpty()) {
-//
-//                String[] parts = autoTimeInAfter.split(":");
-//
-//                int hours = Integer.parseInt(parts[0]);
-//                int minutes = Integer.parseInt(parts[1]);
-//
-//                allowedDuration =
-//                        Duration.ofHours(hours).plusMinutes(minutes);
-//            }
-//
-//            // ===============================
-//            // 5️⃣ Calculate gap
-//            // ===============================
-//
-//            Duration gap = Duration.between(shiftEndDateTime, nowUtc);
-//
-//            // ===============================
-//            // 6️⃣ Apply same logic as clickInOut
-//            // ===============================
-//
-//            if (!gap.isNegative() && gap.compareTo(allowedDuration) > 0) {
-//
-//                // ❌ Gap exceeded → create new record
-//                createUserInOut(
-//                        employee.getEmployeeId(),
-//                        userInOut.getLocations().getId(),
-//                        employee.getCompanyDetails().getId()
-//                );
-//
-//                return;
-//            }
-//
-//            // ✅ Otherwise update existing
-//            userInOut.setTimeOut(Date.from(nowInstant));
-//            this.userInOutRepository.save(userInOut);
-//
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            throw new RuntimeException(e.getMessage());
-//        }
-//    }
-//
-//    public UserInOutDto updateUserInOut(UserInOutDto dto) {
-//
-//        try {
-//
-//            UserInOut userInOut = this.userInOutRepository.findById(dto.getId())
-//                    .orElseThrow(() -> new RuntimeException("UserInOut record not found"));
-//
-//            CompanyEmployee employee = this.companyEmployeeRepository.findById(dto.getUserId())
-//                    .orElseThrow(() -> new RuntimeException("Employee not found"));
-//
-//            userInOut.setUser(employee);
-//
-//            // ===============================
-//            // 1️⃣ Parse timeOut (UTC)
-//            // ===============================
-//
-//            Instant timeOutInstant = null;
-//
-//            if (dto.getTimeOut() != null && !dto.getTimeOut().isEmpty()) {
-//
-//                OffsetDateTime odt = OffsetDateTime.parse(dto.getTimeOut());
-//                timeOutInstant = odt.toInstant();
-//            }
-//
-//            if (timeOutInstant == null) {
-//                throw new RuntimeException("TimeOut is required for update");
-//            }
-//
-//            LocalDateTime timeOutUtc =
-//                    LocalDateTime.ofInstant(timeOutInstant, ZoneOffset.UTC);
-//
-//            // ===============================
-//            // 2️⃣ Get shift times (LOCAL)
-//            // ===============================
-//
-//            LocalTime shiftStart = employee.getCompanyShift()
-//                    .getStartTime()
-//                    .toLocalDateTime()
-//                    .toLocalTime();
-//
-//            LocalTime shiftEnd = employee.getCompanyShift()
-//                    .getEndTime()
-//                    .toLocalDateTime()
-//                    .toLocalTime();
-//
-//            String autoTimeInAfter = employee.getCompanyShift()
-//                    .getAutoTimeInAfterHours();
-//
-//            LocalDate date = timeOutUtc.toLocalDate();
-//
-//            LocalDateTime shiftStartDateTime = LocalDateTime.of(date, shiftStart);
-//            LocalDateTime shiftEndDateTime = LocalDateTime.of(date, shiftEnd);
-//
-//            // ===============================
-//            // 3️⃣ Handle midnight shift
-//            // ===============================
-//
-//            if (shiftEnd.isBefore(shiftStart)) {
-//
-//                if (timeOutUtc.toLocalTime().isBefore(shiftEnd)) {
-//                    shiftStartDateTime = shiftStartDateTime.minusDays(1);
-//                } else {
-//                    shiftEndDateTime = shiftEndDateTime.plusDays(1);
-//                }
-//            }
-//
-//            // ===============================
-//            // 4️⃣ Parse allowed duration
-//            // ===============================
-//
-//            Duration allowedDuration = Duration.ZERO;
-//
-//            if (autoTimeInAfter != null && !autoTimeInAfter.isEmpty()) {
-//
-//                String[] parts = autoTimeInAfter.split(":");
-//
-//                int hours = Integer.parseInt(parts[0]);
-//                int minutes = Integer.parseInt(parts[1]);
-//
-//                allowedDuration =
-//                        Duration.ofHours(hours).plusMinutes(minutes);
-//            }
-//
-//            // ===============================
-//            // 5️⃣ Calculate gap
-//            // ===============================
-//
-//            Duration gap = Duration.between(shiftEndDateTime, timeOutUtc);
-//
-//            // ===============================
-//            // 6️⃣ Apply same logic as clickInOut
-//            // ===============================
-//
-//            if (!gap.isNegative() && gap.compareTo(allowedDuration) > 0) {
-//
-//                // ❌ Gap exceeded → create new record
-//
-//                createUserInOut(employee.getEmployeeId(),
-//                        dto.getLocationId(),
-//                        employee.getCompanyDetails().getId());
-//
-//                return dto;
-//            }
-//
-//            // ✅ Otherwise update normally
-//
-//            userInOut.setTimeOut(Date.from(timeOutInstant));
-//            this.userInOutRepository.save(userInOut);
-//
-//            return dto;
-//
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            throw new RuntimeException(e.getMessage());
-//        }
-//    }
-//
-//    @Override
-//    public String clickInOut(int userId, Integer locationId, Integer companyId) {
-//
-//        try {
-//
-//            CompanyEmployee employee = companyEmployeeRepository.findById(userId)
-//                    .orElseThrow(() -> new RuntimeException("Employee not found"));
-//
-//            LocalTime shiftStart = employee.getCompanyShift()
-//                    .getStartTime()
-//                    .toLocalDateTime()
-//                    .toLocalTime();
-//
-//            LocalTime shiftEnd = employee.getCompanyShift()
-//                    .getEndTime()
-//                    .toLocalDateTime()
-//                    .toLocalTime();
-//
-//            String autoTimeInAfter = employee.getCompanyShift().getAutoTimeInAfterHours();
-//
-//            LocalDateTime now = LocalDateTime.now();
-//            LocalDate today = now.toLocalDate();
-//
-//            LocalDateTime shiftStartDateTime = LocalDateTime.of(today, shiftStart);
-//            LocalDateTime shiftEndDateTime = LocalDateTime.of(today, shiftEnd);
-//
-//            // 🔥 Handle midnight crossing shift
-//            if (shiftEnd.isBefore(shiftStart)) {
-//
-//                if (now.toLocalTime().isBefore(shiftEnd)) {
-//                    shiftStartDateTime = shiftStartDateTime.minusDays(1);
-//                } else {
-//                    shiftEndDateTime = shiftEndDateTime.plusDays(1);
-//                }
-//            }
-//
-//            // ✅ Parse HH:mm safely
-//            Duration allowedDuration = Duration.ZERO;
-//
-//            if (autoTimeInAfter != null && !autoTimeInAfter.isEmpty()) {
-//
-//                String[] parts = autoTimeInAfter.split(":");
-//
-//                int hours = Integer.parseInt(parts[0]);
-//                int minutes = Integer.parseInt(parts[1]);
-//
-//                allowedDuration = Duration.ofHours(hours)
-//                        .plusMinutes(minutes);
-//            }
-//
-//            Duration gap = Duration.between(shiftEndDateTime, now);
-//
-//            UserInOut existing = userInOutRepository.getCurrentUserRecord(userId);
-//
-//            // ✅ BEFORE shift end
-//            if (gap.isNegative()) {
-//
-//                if (existing != null) {
-//                    updateUserInOut(existing.getId(), userId);
-//                    return "updated:" + employee.getUsername();
-//                } else {
-//                    createUserInOut(userId, locationId, companyId);
-//                    return "created:" + employee.getUsername();
-//                }
-//            }
-//
-//            // ✅ AFTER shift end but within allowed gap
-//            if (gap.compareTo(allowedDuration) <= 0) {
-//
-//                if (existing != null) {
-//                    updateUserInOut(existing.getId(), userId);
-//                    return "updated:" + employee.getUsername();
-//                } else {
-//                    createUserInOut(userId, locationId, companyId);
-//                    return "created:" + employee.getUsername();
-//                }
-//            }
-//
-//            // ❌ Gap exceeded → force new record
-//            createUserInOut(userId, locationId, companyId);
-//            return "created (gap exceeded):" + employee.getUsername();
-//
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            throw new RuntimeException(e);
-//        }
-//    }
-//
-//    @Override
-//    public UserInOutDto addClockInOut(UserInOutDto userInOutDto) {
-//        try {
-//            UserInOut userInOut = userInOutDto.getId() != null ? this.userInOutRepository.findById(userInOutDto.getId()).orElseThrow(() -> new RuntimeException("Clock in out not found")) : new UserInOut();
-//
-//            CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(userInOutDto.getUserId())
-//                    .orElseThrow(() -> new RuntimeException("Employee not found"));
-//            CompanyDetails companyDetails = this.companyDetailsRepository.findById(userInOutDto.getCompanyId())
-//                    .orElseThrow(() -> new RuntimeException("Company not found"));
-//
-//            userInOut.setIsSalaryGenerate(0);
-//            userInOut.setUser(companyEmployee);
-//            userInOut.setCompanyDetails(companyDetails);
-//
-//            if (userInOutDto.getCreatedOn() == null) {
-//                userInOut.setCreatedOn(new Date());
-//            } else {
-//                userInOut.setCreatedOn(parseAnyDate(userInOutDto.getCreatedOn()));
-//            }
-//
-//            if (userInOutDto.getTimeIn() != null) {
-//                userInOut.setTimeIn(parseAnyDate(userInOutDto.getTimeIn()));
-//            } else {
-//                throw new RuntimeException("Clock In is required");
-//            }
-//
-//            if (userInOutDto.getTimeOut() != null) {
-//                userInOut.setTimeOut(parseAnyDate(userInOutDto.getTimeOut()));
-//            } else {
-//                userInOut.setTimeOut(null);
-//            }
-//
-//            this.userInOutRepository.save(userInOut);
-//            return userInOutDto;
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            throw new RuntimeException(e);
-//        }
-//    }
 
     public UserInOutDto createUserInOut(int userId, Integer locationId, Integer companyId, Date timeIn) {
         try {
@@ -1316,6 +1226,64 @@ public class UserInOutServiceImpl implements UserInOutService {
             existingRecord.setTimeOut(timeOut);
             userInOutRepository.save(existingRecord);
             return true;
+        }
+    }
+
+    private boolean isWeeklyOffDay(DayOfWeek dayOfWeek, int weekOfMonth, WeeklyOff weeklyOff) {
+        if (weeklyOff == null) return false;
+
+        switch (dayOfWeek) {
+            case SUNDAY:
+                if (weeklyOff.isSundayAll()) return true;
+                return (weekOfMonth == 1 && weeklyOff.isSunday1st()) ||
+                        (weekOfMonth == 2 && weeklyOff.isSunday2nd()) ||
+                        (weekOfMonth == 3 && weeklyOff.isSunday3rd()) ||
+                        (weekOfMonth == 4 && weeklyOff.isSunday4th()) ||
+                        (weekOfMonth == 5 && weeklyOff.isSunday5th());
+            case MONDAY:
+                if (weeklyOff.isMondayAll()) return true;
+                return (weekOfMonth == 1 && weeklyOff.isMonday1st()) ||
+                        (weekOfMonth == 2 && weeklyOff.isMonday2nd()) ||
+                        (weekOfMonth == 3 && weeklyOff.isMonday3rd()) ||
+                        (weekOfMonth == 4 && weeklyOff.isMonday4th()) ||
+                        (weekOfMonth == 5 && weeklyOff.isMonday5th());
+            case TUESDAY:
+                if (weeklyOff.isTuesdayAll()) return true;
+                return (weekOfMonth == 1 && weeklyOff.isTuesday1st()) ||
+                        (weekOfMonth == 2 && weeklyOff.isTuesday2nd()) ||
+                        (weekOfMonth == 3 && weeklyOff.isTuesday3rd()) ||
+                        (weekOfMonth == 4 && weeklyOff.isTuesday4th()) ||
+                        (weekOfMonth == 5 && weeklyOff.isTuesday5th());
+            case WEDNESDAY:
+                if (weeklyOff.isWednesdayAll()) return true;
+                return (weekOfMonth == 1 && weeklyOff.isWednesday1st()) ||
+                        (weekOfMonth == 2 && weeklyOff.isWednesday2nd()) ||
+                        (weekOfMonth == 3 && weeklyOff.isWednesday3rd()) ||
+                        (weekOfMonth == 4 && weeklyOff.isWednesday4th()) ||
+                        (weekOfMonth == 5 && weeklyOff.isWednesday5th());
+            case THURSDAY:
+                if (weeklyOff.isThursdayAll()) return true;
+                return (weekOfMonth == 1 && weeklyOff.isThursday1st()) ||
+                        (weekOfMonth == 2 && weeklyOff.isThursday2nd()) ||
+                        (weekOfMonth == 3 && weeklyOff.isThursday3rd()) ||
+                        (weekOfMonth == 4 && weeklyOff.isThursday4th()) ||
+                        (weekOfMonth == 5 && weeklyOff.isThursday5th());
+            case FRIDAY:
+                if (weeklyOff.isFridayAll()) return true;
+                return (weekOfMonth == 1 && weeklyOff.isFriday1st()) ||
+                        (weekOfMonth == 2 && weeklyOff.isFriday2nd()) ||
+                        (weekOfMonth == 3 && weeklyOff.isFriday3rd()) ||
+                        (weekOfMonth == 4 && weeklyOff.isFriday4th()) ||
+                        (weekOfMonth == 5 && weeklyOff.isFriday5th());
+            case SATURDAY:
+                if (weeklyOff.isSaturdayAll()) return true;
+                return (weekOfMonth == 1 && weeklyOff.isSaturday1st()) ||
+                        (weekOfMonth == 2 && weeklyOff.isSaturday2nd()) ||
+                        (weekOfMonth == 3 && weeklyOff.isSaturday3rd()) ||
+                        (weekOfMonth == 4 && weeklyOff.isSaturday4th()) ||
+                        (weekOfMonth == 5 && weeklyOff.isSaturday5th());
+            default:
+                return false;
         }
     }
 }

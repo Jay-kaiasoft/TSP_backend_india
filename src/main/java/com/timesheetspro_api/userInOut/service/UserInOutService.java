@@ -12,6 +12,8 @@ public interface UserInOutService {
 
     Map<String, Object> dashboardCounts(int companyId);
 
+    Map<String, Object> getAllEntriesGroupByUser(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds,Integer companyId);
+
     List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds,Integer companyId);
 
     UserInOutDto getUserLastInOut(int id);

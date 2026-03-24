@@ -22,4 +22,11 @@ public class UserInOutDto {
     private CompanyShiftDto companyShiftDto;
     private Integer isSalaryGenerate;
     private String timeZone;
+    private String regular;
+    private String breakTime;
+    private String overtime;
+    private String totalHours;
+    private String workHours;
+    private String status;
+    private String department;
 }

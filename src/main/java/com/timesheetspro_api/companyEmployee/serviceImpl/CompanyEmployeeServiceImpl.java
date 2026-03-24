@@ -152,9 +152,9 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
 //                            BigDecimal totalPfAmount = pfAmountPerDay.multiply(BigDecimal.valueOf(daysWorked));
                             map.put("basic_salary", emp.getBasicSalary());
                             map.put("total_basic_salary", totalBasicSalary);
-                            map.put("employee_pf_amount", pfAmount.compareTo(BigDecimal.valueOf(900)) > 0 ? 900 : pfAmount);
-                            map.put("employer_pf_amount", pfAmount.compareTo(BigDecimal.valueOf(900)) > 0 ? 900 : pfAmount);
-                            map.put("total_amount", pfAmount.multiply(BigDecimal.valueOf(2)).compareTo(BigDecimal.valueOf(1800)) > 0 ? BigDecimal.valueOf(1800) : pfAmount.multiply(BigDecimal.valueOf(2)));
+                            map.put("employee_pf_amount", pfAmount.compareTo(BigDecimal.valueOf(1800)) > 0 ? 1800 : pfAmount);
+                            map.put("employer_pf_amount", pfAmount.compareTo(BigDecimal.valueOf(1800)) > 0 ? 1800 : pfAmount);
+                            map.put("total_amount", pfAmount.multiply(BigDecimal.valueOf(2)).compareTo(BigDecimal.valueOf(3600)) > 0 ? BigDecimal.valueOf(3600) : pfAmount.multiply(BigDecimal.valueOf(2)));
                             map.put("pf_percentage", pfPercentage);
                         } else {
                             Integer totalBasicSalary = emp.getBasicSalary() * month;
