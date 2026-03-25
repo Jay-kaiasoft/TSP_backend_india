@@ -75,6 +75,16 @@ public class UserInOutServiceImpl implements UserInOutService {
     @Autowired
     private HolidayTemplateDetailsService holidayTemplateDetailsService;
 
+    private LocalDate parseDateString(String dateStr) {
+        if (dateStr == null) return null;
+        // Remove any trailing time part (e.g., "25/03/2026, 16:19:57")
+        if (dateStr.contains(",")) {
+            dateStr = dateStr.split(",")[0].trim();
+        }
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        return LocalDate.parse(dateStr, formatter);
+    }
+
     @Override
     public Map<String, Object> dashboardCounts(int companyId) {
         try {
@@ -111,33 +121,96 @@ public class UserInOutServiceImpl implements UserInOutService {
     @Override
     public Map<String, Object> getAllEntriesGroupByUser(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds, Integer companyId) {
         try {
-            // --- Date handling: obtain UTC Date objects and corresponding local dates ---
-            Date startUTC, endUTC;
+//            // --- Date handling: obtain UTC Date objects and corresponding local dates ---
+//            Date startUTC, endUTC;
+//            LocalDate startLocal, endLocal;
+//
+//            if (startDate == null || endDate == null) {
+//                // Default to current month in UTC
+//                Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+//                calendar.set(Calendar.DAY_OF_MONTH, 1);
+//                startUTC = calendar.getTime();
+//                calendar.add(Calendar.MONTH, 1);
+//                calendar.set(Calendar.DAY_OF_MONTH, 0);
+//                endUTC = new Date(); // Current time
+//
+//                // Convert UTC dates to local dates using the given time zone
+//                startLocal = startUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
+//                endLocal = endUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
+//            } else {
+//                // Use commonService to convert input strings to UTC Date (handles any extra characters)
+//                startUTC = this.commonService.convertLocalToUtc(startDate, timeZone, false);
+//                endUTC = this.commonService.convertLocalToUtc(endDate, timeZone, true);
+//
+//                // Derive local dates from the UTC results
+//                startLocal = startUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
+//                endLocal = endUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
+//            }
+//
+//            // --- Build specification with filters (unchanged) ---
+//            Specification<UserInOut> spec = UserInOutSpecification.createdOnGreaterThanEqual(startUTC);
+//            if (userIds != null && !userIds.isEmpty()) {
+//                spec = spec.and(UserInOutSpecification.userIdIn(userIds));
+//            }
+//            if (locationIds != null && !locationIds.isEmpty()) {
+//                spec = spec.and(UserInOutSpecification.hasLocationId(locationIds));
+//            }
+//            if (departmentIds != null && !departmentIds.isEmpty()) {
+//                spec = spec.and(UserInOutSpecification.hasDepartmentIds(departmentIds));
+//            }
+//            if (companyId != null) {
+//                spec = spec.and(UserInOutSpecification.hasCompany(companyId));
+//            }
+//            spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(endUTC));
+//
+//            // --- Fetch data from repository ---
+//            List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
+//
+//            // --- Group by User entity ---
+//            Map<CompanyEmployee, List<UserInOut>> groupedByUser = userInOutList.stream()
+//                    .collect(Collectors.groupingBy(UserInOut::getUser));
+//
+//            // --- Build the list of all dates in the range (inclusive) ---
+//            List<LocalDate> dateRange = startLocal.datesUntil(endLocal.plusDays(1)).collect(Collectors.toList());
+
+
+            ZoneId zone = ZoneId.of(timeZone);
+            Instant startInstant, endInstant;
             LocalDate startLocal, endLocal;
 
             if (startDate == null || endDate == null) {
-                // Default to current month in UTC
-                Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-                calendar.set(Calendar.DAY_OF_MONTH, 1);
-                startUTC = calendar.getTime();
-                calendar.add(Calendar.MONTH, 1);
-                calendar.set(Calendar.DAY_OF_MONTH, 0);
-                endUTC = new Date(); // Current time
+                // Default: current month in UTC
+                ZoneId utc = ZoneId.of("UTC");
+                LocalDate now = LocalDate.now(utc);
+                startLocal = now.withDayOfMonth(1);
+                endLocal = now;
 
-                // Convert UTC dates to local dates using the given time zone
-                startLocal = startUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
-                endLocal = endUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
+                ZonedDateTime startZdt = startLocal.atStartOfDay(utc);
+                ZonedDateTime endZdt = endLocal.atTime(LocalTime.MAX).atZone(utc);
+                startInstant = startZdt.toInstant();
+                endInstant = endZdt.toInstant();
+
+                // Convert to local timezone for display range
+                startLocal = startInstant.atZone(zone).toLocalDate();
+                endLocal = endInstant.atZone(zone).toLocalDate();
             } else {
-                // Use commonService to convert input strings to UTC Date (handles any extra characters)
-                startUTC = this.commonService.convertLocalToUtc(startDate, timeZone, false);
-                endUTC = this.commonService.convertLocalToUtc(endDate, timeZone, true);
+                startLocal = parseDateString(startDate);
+                endLocal = parseDateString(endDate);
 
-                // Derive local dates from the UTC results
-                startLocal = startUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
-                endLocal = endUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
+                // Start of day in given timezone
+                ZonedDateTime startZdt = startLocal.atStartOfDay(zone);
+                startInstant = startZdt.toInstant();
+
+                // End of day in given timezone
+                ZonedDateTime endZdt = endLocal.atTime(LocalTime.MAX).atZone(zone);
+                endInstant = endZdt.toInstant();
             }
 
-            // --- Build specification with filters (unchanged) ---
+            // Convert to java.util.Date for specification (if needed)
+            Date startUTC = Date.from(startInstant);
+            Date endUTC = Date.from(endInstant);
+
+            // --- Build specification (unchanged) ---
             Specification<UserInOut> spec = UserInOutSpecification.createdOnGreaterThanEqual(startUTC);
             if (userIds != null && !userIds.isEmpty()) {
                 spec = spec.and(UserInOutSpecification.userIdIn(userIds));
@@ -153,15 +226,16 @@ public class UserInOutServiceImpl implements UserInOutService {
             }
             spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(endUTC));
 
-            // --- Fetch data from repository ---
+            // --- Fetch data from repository (unchanged) ---
             List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
 
-            // --- Group by User entity ---
+            // --- Group by User entity (unchanged) ---
             Map<CompanyEmployee, List<UserInOut>> groupedByUser = userInOutList.stream()
                     .collect(Collectors.groupingBy(UserInOut::getUser));
 
             // --- Build the list of all dates in the range (inclusive) ---
             List<LocalDate> dateRange = startLocal.datesUntil(endLocal.plusDays(1)).collect(Collectors.toList());
+
             // --- Prepare response ---
             List<Map<String, Object>> userGroups = new ArrayList<>();
 
@@ -200,8 +274,6 @@ public class UserInOutServiceImpl implements UserInOutService {
                         List<HolidayTemplateDetailsDto> dtoList = this.holidayTemplateDetailsService.getAllHolidayTemplateDetailsByTemplateId(template.getId());
                         if (dtoList != null && !dtoList.isEmpty()) {
                             for (HolidayTemplateDetailsDto dto : dtoList) {
-                                System.out.println("dto date: " + dto.getDate());
-
                                 // Assuming dto.getDate() returns "18/03/2026, 12:00:00 AM"
                                 // Extract just the "18/03/2026" part for easy matching
                                 if (dto.getDate() != null && dto.getDate().length() >= 10) {
@@ -253,9 +325,9 @@ public class UserInOutServiceImpl implements UserInOutService {
                         totalOvertimeMinutes += overtimeMinutes;
 
                         dataItem.put("id", uio.getId());
-                        dataItem.put("timeIn", this.commonService.convertDateToString(timeIn));
-                        dataItem.put("timeOut", this.commonService.convertDateToString(timeOut));
-                        dataItem.put("createdOn", this.commonService.convertDateToString(uio.getCreatedOn()));
+                        dataItem.put("timeIn", this.commonService.convertDateToString(timeIn, timeZone));
+                        dataItem.put("timeOut", this.commonService.convertDateToString(timeOut, timeZone));
+                        dataItem.put("createdOn", this.commonService.convertDateToString(uio.getCreatedOn(), timeZone));
                         dataItem.put("locationId", uio.getLocations() != null ? uio.getLocations().getId() : null);
                         dataItem.put("regular", formatMinutesToHHmm(regularMinutes));
                         dataItem.put("breakTime", formatMinutesToHHmm(breakMinutes));
@@ -275,7 +347,7 @@ public class UserInOutServiceImpl implements UserInOutService {
                         dataItem.put("id", null);
                         dataItem.put("timeIn", null);
                         dataItem.put("timeOut", null);
-                        dataItem.put("createdOn", this.commonService.convertDateToString(createdOnDate));
+                        dataItem.put("createdOn", this.commonService.convertDateToString(createdOnDate, timeZone));
                         dataItem.put("locationId", null);
                         dataItem.put("regular", formatMinutesToHHmm(regularMinutes));
                         dataItem.put("breakTime", formatMinutesToHHmm(breakMinutes));
@@ -294,7 +366,7 @@ public class UserInOutServiceImpl implements UserInOutService {
                 // --- Build user group object with totals ---
                 Map<String, Object> userGroup = new HashMap<>();
                 userGroup.put("id", user.getEmployeeId());
-                userGroup.put("username", user.getUsername());
+                userGroup.put("username", user.getFirstName() + " " + user.getLastName());
                 userGroup.put("department", user.getDepartment().getDepartmentName());
                 userGroup.put("data", dataList);
                 userGroup.put("totalHours", formatMinutesToHHmm(totalGrossMinutes));
@@ -316,25 +388,34 @@ public class UserInOutServiceImpl implements UserInOutService {
     @Override
     public List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds, Integer companyId) {
         try {
-            // --- Date handling ---
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-            dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+            // --- Date handling using java.time ---
+            ZoneId zone = ZoneId.of(timeZone);
+            Instant startInstant, endInstant;
 
-            Date start, end;
             if (startDate == null || endDate == null) {
-                Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-                calendar.set(Calendar.DAY_OF_MONTH, 1);
-                start = calendar.getTime();
-                calendar.add(Calendar.MONTH, 1);
-                calendar.set(Calendar.DAY_OF_MONTH, 0);
-                end = calendar.getTime();
+                // Default: current month in UTC
+                ZoneId utc = ZoneId.of("UTC");
+                LocalDate now = LocalDate.now(utc);
+                LocalDate firstOfMonth = now.withDayOfMonth(1);
+                ZonedDateTime startZdt = firstOfMonth.atStartOfDay(utc);
+                ZonedDateTime endZdt = now.atTime(LocalTime.MAX).atZone(utc);
+                startInstant = startZdt.toInstant();
+                endInstant = endZdt.toInstant();
             } else {
-                start = this.commonService.convertLocalToUtc(startDate, timeZone, false);
-                end = this.commonService.convertLocalToUtc(endDate, timeZone, true);
+                LocalDate startLocal = parseDateString(startDate);
+                LocalDate endLocal = parseDateString(endDate);
+
+                ZonedDateTime startZdt = startLocal.atStartOfDay(zone);
+                ZonedDateTime endZdt = endLocal.atTime(LocalTime.MAX).atZone(zone);
+                startInstant = startZdt.toInstant();
+                endInstant = endZdt.toInstant();
             }
 
-            // --- Build specification ---
-            Specification<UserInOut> spec = UserInOutSpecification.createdOnGreaterThanEqual(start);
+            Date startUTC = Date.from(startInstant);
+            Date endUTC = Date.from(endInstant);
+
+            // --- Build specification (unchanged) ---
+            Specification<UserInOut> spec = UserInOutSpecification.createdOnGreaterThanEqual(startUTC);
             if (userIds != null && !userIds.isEmpty()) {
                 spec = spec.and(UserInOutSpecification.userIdIn(userIds));
             }
@@ -347,10 +428,11 @@ public class UserInOutServiceImpl implements UserInOutService {
             if (companyId != null) {
                 spec = spec.and(UserInOutSpecification.hasCompany(companyId));
             }
-            spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(end));
+            spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(endUTC));
 
-            // --- Fetch raw entries ---
+            // --- Fetch raw entries (unchanged) ---
             List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
+
 
             // --- Collect distinct user IDs from the entries ---
             Set<Integer> distinctUserIds = userInOutList.stream()
@@ -379,14 +461,14 @@ public class UserInOutServiceImpl implements UserInOutService {
                     .map(userInOut -> {
                         UserInOutDto dto = new UserInOutDto();
                         dto.setId(userInOut.getId());
-                        dto.setUserName(userInOut.getUser().getUsername());
+                        dto.setUserName(userInOut.getUser().getFirstName() + " " + userInOut.getUser().getLastName());
                         dto.setHourlyRate(userInOut.getUser().getHourlyRate());
                         dto.setFirstName(userInOut.getUser().getFirstName());
                         dto.setLastName(userInOut.getUser().getLastName());
-                        dto.setCreatedOn(this.commonService.convertDateToString(userInOut.getCreatedOn()));
-                        dto.setTimeIn(this.commonService.convertDateToString(userInOut.getTimeIn()));
+                        dto.setCreatedOn(this.commonService.convertDateToString(userInOut.getCreatedOn(), timeZone));
+                        dto.setTimeIn(this.commonService.convertDateToString(userInOut.getTimeIn(), timeZone));
                         if (userInOut.getTimeOut() != null) {
-                            dto.setTimeOut(this.commonService.convertDateToString(userInOut.getTimeOut()));
+                            dto.setTimeOut(this.commonService.convertDateToString(userInOut.getTimeOut(), timeZone));
                         }
                         if (userInOut.getLocations() != null) {
                             dto.setLocationId(userInOut.getLocations().getId());
@@ -433,7 +515,7 @@ public class UserInOutServiceImpl implements UserInOutService {
                             dto.setStatus("A"); // I = incomplete
                             dto.setDepartment(userInOut.getUser().getDepartment().getDepartmentName());
                         }
-
+                        dto.setStatus(userInOut.getTimeIn() != null ? "P" : "A");
                         return dto;
                     })
                     .collect(Collectors.toList());
@@ -471,7 +553,7 @@ public class UserInOutServiceImpl implements UserInOutService {
             if (userInOut != null) {
                 userInOutDto.setUserId(userInOut.getUser().getEmployeeId());
 
-                userInOutDto.setTimeIn(this.commonService.convertDateToString(userInOut.getTimeIn()));
+                userInOutDto.setTimeIn(this.commonService.convertDateToString(userInOut.getTimeIn(), "Asia/Calcutta"));
                 if (userInOut.getLocations() != null) {
                     userInOutDto.setLocationId(userInOut.getLocations().getId());
                 }
@@ -491,9 +573,9 @@ public class UserInOutServiceImpl implements UserInOutService {
             UserInOutDto userInOutDto = new UserInOutDto();
             userInOutDto.setId(userInOut.getId());
             userInOutDto.setUserId(userInOut.getUser().getEmployeeId());
-            userInOutDto.setTimeIn(this.commonService.convertDateToString(userInOut.getTimeIn()));
+            userInOutDto.setTimeIn(this.commonService.convertDateToString(userInOut.getTimeIn(), "Asia/Calcutta")); // Defaulting to IST or pass TZ?
             if (userInOut.getTimeOut() != null) {
-                userInOutDto.setTimeOut(this.commonService.convertDateToString(userInOut.getTimeOut()));
+                userInOutDto.setTimeOut(this.commonService.convertDateToString(userInOut.getTimeOut(), "Asia/Calcutta"));
             }
             if (userInOut.getLocations() != null) {
                 userInOutDto.setLocationId(userInOut.getLocations().getId());
@@ -721,8 +803,8 @@ public class UserInOutServiceImpl implements UserInOutService {
         return entries.stream().map(entry -> {
             UserInOutDto dto = new UserInOutDto();
             dto.setId(entry.getId());
-            dto.setTimeIn(this.commonService.convertDateToString(entry.getTimeIn()));
-            dto.setTimeOut(this.commonService.convertDateToString(entry.getTimeOut()));
+            dto.setTimeIn(this.commonService.convertDateToString(entry.getTimeIn(), "Asia/Calcutta"));
+            dto.setTimeOut(this.commonService.convertDateToString(entry.getTimeOut(), "Asia/Calcutta"));
             dto.setUserId(entry.getUser().getEmployeeId());
             return dto;
         }).collect(Collectors.toList());
@@ -789,8 +871,8 @@ public class UserInOutServiceImpl implements UserInOutService {
                     Map<String, Object> dayRecord = Map.of(
                             "records", List.of(
                                     Map.of(
-                                            "timeIn", this.commonService.convertDateToString(record.getTimeIn()),
-                                            "timeOut", record.getTimeOut() != null ? this.commonService.convertDateToString(record.getTimeOut()) : ""
+                                            "timeIn", this.commonService.convertDateToString(record.getTimeIn(), timeZone),
+                                            "timeOut", record.getTimeOut() != null ? this.commonService.convertDateToString(record.getTimeOut(), timeZone) : ""
                                     )
                             )
                     );

@@ -12,17 +12,20 @@ import com.timesheetspro_api.common.dto.holidayTemplates.HolidayTemplatesDto;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.UserInOut.UserInOut;
 import com.timesheetspro_api.common.model.attendancePenaltyRules.AttendancePenaltyRules;
+import com.timesheetspro_api.common.model.holidayTemplates.HolidayTemplates;
 import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
 import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
 import com.timesheetspro_api.common.repository.OvertimeRulesRepository;
 import com.timesheetspro_api.common.repository.UserInOutRepository;
 import com.timesheetspro_api.common.repository.company.AttendancePenaltyRulesRepository;
 import com.timesheetspro_api.common.repository.company.CompanyEmployeeRepository;
+import com.timesheetspro_api.common.repository.company.HolidayTemplatesRepository;
 import com.timesheetspro_api.common.repository.company.WeeklyOffRepository;
 import com.timesheetspro_api.common.service.CommonService;
 import com.timesheetspro_api.common.specification.EmployeeStatementSpecification;
 import com.timesheetspro_api.common.specification.UserInOutSpecification;
 import com.timesheetspro_api.employeeStatements.service.EmployeeSalaryStatementService;
+import com.timesheetspro_api.holidayTemplateDetails.service.HolidayTemplateDetailsService;
 import com.timesheetspro_api.holidayTemplates.service.HolidayTemplatesService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.domain.Specification;
@@ -56,6 +59,12 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
 
     @Autowired
     private WeeklyOffRepository weeklyOffRepository;
+
+    @Autowired
+    private HolidayTemplatesRepository holidayTemplatesRepository;
+
+    @Autowired
+    private HolidayTemplateDetailsService holidayTemplateDetailsService;
 
     @Override
     public List<EmployeeSalaryStatementDto> getEmployeeSalaryStatements(SalaryStatementRequestDto salaryStatementRequestDto) {
@@ -99,8 +108,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
     }
 
     private EmployeeSalaryStatementDto buildEmployeeSalaryStatement(CompanyEmployee companyEmployee, SalaryStatementRequestDto salaryStatementRequestDto) {
-
-        // Date range handling
+        // 1. Date range handling
         java.util.Date startDate, endDate;
         if (salaryStatementRequestDto.getStartDate() != null || salaryStatementRequestDto.getEndDate() != null) {
             startDate = this.commonService.convertStringToDate(salaryStatementRequestDto.getStartDate());
@@ -112,166 +120,156 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
             calendar.add(Calendar.MONTH, 1);
             calendar.set(Calendar.DAY_OF_MONTH, 0);
             endDate = calendar.getTime();
-
         }
-        // Initialize DTO with basic employee info
+
+        // Initialize DTO
         EmployeeSalaryStatementDto dto = new EmployeeSalaryStatementDto();
         dto.setEmployeeId(companyEmployee.getEmployeeId());
         dto.setCompanyId(companyEmployee.getCompanyDetails().getId());
         dto.setEmployeeName(companyEmployee.getFirstName() + " " + companyEmployee.getLastName());
 
-        if (companyEmployee.getBasicSalary() != null) {
-            dto.setBasicSalary(companyEmployee.getBasicSalary());
-        }
+        if (companyEmployee.getBasicSalary() != null) dto.setBasicSalary(companyEmployee.getBasicSalary());
         if (companyEmployee.getDepartment() != null) {
             dto.setDepartmentId(companyEmployee.getDepartment().getId());
             dto.setDepartmentName(companyEmployee.getDepartment().getDepartmentName());
         }
 
-        // Get working day configuration
-        WeeklyOff workingDayConfig = companyEmployee.getWeeklyOff();
-        // Calculate all working days for the period (including paid weekly-offs)
-        int totalPaidDays = 0;
-        if (workingDayConfig != null) {
-            Set<LocalDate> allPaidDays = new HashSet<>();
-            allPaidDays = calculatePaidDays(startDate, endDate, workingDayConfig);
-            totalPaidDays = allPaidDays.size();
+        // 2. Fetch Holiday Dates
+        List<String> holidayDates = new ArrayList<>();
+        if (companyEmployee.getHolidayTemplates() != null) {
+            HolidayTemplatesDto holidayTemplate = this.holidayTemplatesService
+                    .getHolidayTemplateById(companyEmployee.getHolidayTemplates().getId());
+
+            if (holidayTemplate != null && holidayTemplate.getHolidayTemplateDetailsList() != null) {
+                for (HolidayTemplateDetailsDto detail : holidayTemplate.getHolidayTemplateDetailsList()) {
+                    if (detail.getDate() != null && detail.getDate().length() >= 10) {
+                        holidayDates.add(detail.getDate().substring(0, 10)); // Extract dd/MM/yyyy
+                    }
+                }
+            }
         }
 
-        // Get actual attendance data
+        // 3. Get Paid Day Configuration (All potential Weekly Offs + Holidays in range)
+        Set<LocalDate> configPaidOffDays = new HashSet<>();
+        if (companyEmployee.getWeeklyOff() != null) {
+            configPaidOffDays = calculatePaidDays(startDate, endDate, companyEmployee.getWeeklyOff(), holidayDates);
+        }
+
+        // 4. Get actual attendance data
         Specification<UserInOut> userSpec = Specification.where(EmployeeStatementSpecification.hasUserIds(List.of(companyEmployee.getEmployeeId())))
                 .and(UserInOutSpecification.createdOnGreaterThanEqual(startDate))
                 .and(UserInOutSpecification.createdOnLessThanEqual(endDate))
                 .and(UserInOutSpecification.isSalaryGenerate());
 
         List<UserInOut> userInOutList = this.userInOutRepository.findAll(userSpec);
-        if (userInOutList.isEmpty()) {
-            return null;
-        }
+        if (userInOutList.isEmpty()) return null;
 
-        // Process attendance records
+        // 5. Process attendance records
         Map<LocalDate, Long> dailyWorkedMinutes = new HashMap<>();
         Set<LocalDate> actualWorkDays = new HashSet<>();
+
         long totalWorkedMillis = 0;
         int penaltyAmount = 0;
-        long workedMinutes = 0L;
 
         for (UserInOut userInOut : userInOutList) {
             dto.setClockInOutId(userInOut.getId());
-            Date timeIn = userInOut.getTimeIn() != null ? new Date(userInOut.getTimeIn().getTime()) : null;
-            Date timeOut = userInOut.getTimeOut() != null ? new Date(userInOut.getTimeOut().getTime()) : null;
+            java.util.Date timeIn = userInOut.getTimeIn();
+            java.util.Date timeOut = userInOut.getTimeOut();
 
             if (timeIn != null && timeOut != null) {
                 long workedMillis = timeOut.getTime() - timeIn.getTime();
                 totalWorkedMillis += workedMillis;
 
-                Instant instant = new java.util.Date(timeIn.getTime()).toInstant();
-                LocalDate date = instant.atZone(ZoneId.systemDefault()).toLocalDate();
-
+                LocalDate date = timeIn.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
                 long workMinutes = workedMillis / (1000 * 60);
-                workedMinutes = workedMinutes + workMinutes;
+
                 dailyWorkedMinutes.merge(date, workMinutes, Long::sum);
-                actualWorkDays.add(date);
+                actualWorkDays.add(date); // This adds the worked holiday (e.g., 25/03/26) to actualWorkDays
 
-                // Calculate penalty amount
-                if (companyEmployee.getLateEntryPenaltyRule()) {
-                    if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
-                        int latePenalty = calculateLateEntryPenalty(companyEmployee, userInOut.getTimeIn());
-                        penaltyAmount += latePenalty;
+                // Penalty Calculations
+                if (Boolean.TRUE.equals(companyEmployee.getLateEntryPenaltyRule()) && companyEmployee.getCompanyShift() != null) {
+                    if (companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
+                        penaltyAmount += calculateLateEntryPenalty(companyEmployee, userInOut.getTimeIn());
                     }
                 }
-                if (companyEmployee.getEarlyExitPenaltyRule()) {
-                    if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
-                        int earlyPenalty = calculateEarlyExitPenalty(companyEmployee, userInOut.getTimeOut());
-                        penaltyAmount += earlyPenalty;
-                    }
-                }
-            }
-        }
-        if (companyEmployee.getHolidayTemplates() != null) {
-            HolidayTemplatesDto holidayTemplate = this.holidayTemplatesService
-                    .getHolidayTemplateById(companyEmployee.getHolidayTemplates().getId());
-
-            if (holidayTemplate != null && holidayTemplate.getHolidayTemplateDetailsList() != null
-                    && !holidayTemplate.getHolidayTemplateDetailsList().isEmpty()) {
-
-                // ✅ DATE FIX (DD/MM/YYYY)
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy, hh:mm:ss a", Locale.ENGLISH);
-
-                // Convert the requested range to LocalDate for comparison
-                LocalDate rangeStart = startDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-                LocalDate rangeEnd = endDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-
-                for (HolidayTemplateDetailsDto detail : holidayTemplate.getHolidayTemplateDetailsList()) {
-                    String dateStr = detail.getDate();
-                    if (dateStr != null && !dateStr.isBlank()) {
-                        try {
-                            LocalDate holidayDate = LocalDate.parse(dateStr, formatter);
-
-                            // NEW CHECK: Only add if the holiday is within the requested filter range
-                            if (!holidayDate.isBefore(rangeStart) && !holidayDate.isAfter(rangeEnd)) {
-                                actualWorkDays.add(holidayDate);
-                            }
-                        } catch (DateTimeParseException e) {
-                            throw new RuntimeException("Invalid date in holiday template: " + dateStr, e);
-                        }
+                if (Boolean.TRUE.equals(companyEmployee.getEarlyExitPenaltyRule()) && companyEmployee.getCompanyShift() != null) {
+                    if (companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
+                        penaltyAmount += calculateEarlyExitPenalty(companyEmployee, userInOut.getTimeOut());
                     }
                 }
             }
         }
 
-        // Calculate overtime
+        // --- 6. FIX: Calculate Final Paid Days ---
+        // Remove any day the employee actually worked from the paid off-days pool.
+        // E.g., If configPaidOffDays has 5 days, and actualWorkDays contains 1 of those days,
+        // it removes that 1 day, leaving 4 totalPaidDaysCount.
+        configPaidOffDays.removeAll(actualWorkDays);
+
+        int totalPaidDaysCount = configPaidOffDays.size(); // This will now correctly be 4
+
+        // 7. Overtime & Deductions
         float employeeShiftHours = companyEmployee.getCompanyShift() != null ? companyEmployee.getCompanyShift().getTotalHours() : 0;
-        long employeeWorkedMinutes = totalWorkedMillis / (1000 * 60);
-        long totalWorkedMinutes = employeeWorkedMinutes - (actualWorkDays.size() * (companyEmployee.getLunchBreak() != null ? companyEmployee.getLunchBreak() : 0));
+        long totalWorkedMinutes = totalWorkedMillis / (1000 * 60);
+        int lunchDeduction = actualWorkDays.size() * (companyEmployee.getLunchBreak() != null ? companyEmployee.getLunchBreak() : 0);
+        long netWorkedMinutes = totalWorkedMinutes - lunchDeduction;
+
         float shiftMinutes = employeeShiftHours * 60L;
-//        System.out.println("============= Employee Shift Hours ============" + employeeShiftHours + " | Shift Minutes: " + shiftMinutes);
-//        System.out.println("============= Total Worked Minutes ============" + totalWorkedMinutes + " | Worked Minutes: " + employeeWorkedMinutes + " | Lunch Breaks Total: " + (actualWorkDays.size() * companyEmployee.getLunchBreak()));
-//        long otMinutes = Math.max(totalWorkedMinutes - (actualWorkDays.size() * shiftMinutes), 0);
-        float otMinutes = Math.max(totalWorkedMinutes - shiftMinutes, 0);
-//        System.out.println("============= otMinutes ================" + otMinutes);
-        int otFinalMinutes = (int) otMinutes;
+        int otFinalMinutes = (int) Math.max(netWorkedMinutes - shiftMinutes, 0);
         int otAmountFinal = calculateOvertimeAmount(companyEmployee, otFinalMinutes);
 
-        // Calculate PF
+        // PF & PT
         int pfAmount = calculatePfAmount(companyEmployee);
+        pfAmount = Math.min(pfAmount, 1800);
+        dto.setTotalPfAmount(pfAmount);
+
         if (companyEmployee.getPfPercentage() != null && companyEmployee.getPfPercentage() > 0) {
             dto.setPfPercentage(companyEmployee.getPfPercentage());
         } else {
             dto.setPfAmount(companyEmployee.getPfAmount());
         }
-        dto.setTotalPfAmount(pfAmount > 1800 ? 1800 : pfAmount);
-        pfAmount = pfAmount > 1800 ? 1800 : pfAmount;
 
-        // Calculate PT
-        int ptAmount = Boolean.TRUE.equals(companyEmployee.getIsPt()) ? companyEmployee.getPtAmount() : 0;
+        int ptAmount = Boolean.TRUE.equals(companyEmployee.getIsPt()) ? (companyEmployee.getPtAmount() != null ? companyEmployee.getPtAmount() : 0) : 0;
         dto.setPtAmount(ptAmount);
 
-        // Calculate canteen deductions
+        // Canteen & Penalties
         int otherDeductions = calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays) + penaltyAmount;
         int totalDeductions = pfAmount + ptAmount + otherDeductions;
 
-        // Calculate earnings
+        // 8. Earnings
         long dailySalary = 0L;
         if (companyEmployee.getEmployeeType().getId() == 2 && companyEmployee.getHourlyRate() != null) {
-            double workedHours = totalWorkedMinutes / 60.0;
-            long roundedHours = (long) Math.ceil(workedHours);
-            dailySalary = (long) (roundedHours * companyEmployee.getHourlyRate());
+            double workedHours = netWorkedMinutes / 60.0;
+            dailySalary = (long) (Math.ceil(workedHours) * companyEmployee.getHourlyRate());
         } else {
             dailySalary = companyEmployee.getBasicSalary() / 30;
         }
-        int baseSalary = (int) (dailySalary * (totalPaidDays + actualWorkDays.size()));
+
+        // Base Salary uses (Standard Unworked Paid Days + Days they physically came in)
+        int baseSalary = (int) (dailySalary * (totalPaidDaysCount + actualWorkDays.size()));
         int totalEarnings = baseSalary + otAmountFinal;
 
+        // 9. Set DTO values
+        dto.setOverTime(otFinalMinutes);
+        dto.setOtAmount(otAmountFinal);
+        dto.setTotalPaidDays(totalPaidDaysCount); // Outputs: 4
+        dto.setTotalWorkingDays(actualWorkDays.size()); // Outputs: 1
+        dto.setTotalDays(totalPaidDaysCount + actualWorkDays.size()); // Outputs: 5
+        dto.setTotalEarnSalary(baseSalary);
+        dto.setOtherDeductions(otherDeductions);
+        dto.setTotalPenaltyAmount(penaltyAmount);
+        dto.setTotalEarnings(totalEarnings);
+        dto.setTotalDeductions(totalDeductions);
+        dto.setNetSalary(totalEarnings - totalDeductions);
 
         System.out.println("============= Debugging Employee Salary Statement for Employee: ================" + companyEmployee.getUsername());
         System.out.println("Basic Salary: " + companyEmployee.getBasicSalary());
         System.out.println("Daily Salary: " + dailySalary);
         System.out.println("Start Date: " + startDate);
         System.out.println("End Date: " + endDate);
-        System.out.println("Paid Days: " + totalPaidDays);
+        System.out.println("Paid Days: " + totalPaidDaysCount);
         System.out.println("Worked Days: " + actualWorkDays.size());
-        System.out.println("Total Worked Days: " + (actualWorkDays.size() + totalPaidDays));
+        System.out.println("Total Worked Days: " + (actualWorkDays.size() + totalPaidDaysCount));
         System.out.println("Total Worked Minutes: " + totalWorkedMinutes);
         System.out.println("Overtime Minutes: " + otFinalMinutes);
         System.out.println("Overtime Amount: " + otAmountFinal);
@@ -283,102 +281,259 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         System.out.println("Total Deductions: " + totalDeductions);
         System.out.println("Net Salary: " + (totalEarnings - totalDeductions));
 
-        // Set all calculated values
-        dto.setOverTime(otFinalMinutes);
-        dto.setOtAmount(otAmountFinal);
-        dto.setTotalPaidDays(totalPaidDays);
-        dto.setTotalWorkingDays(actualWorkDays.size());
-        dto.setTotalDays((actualWorkDays.size() + totalPaidDays));
-        dto.setTotalEarnSalary(baseSalary);
-        dto.setOtherDeductions(otherDeductions);
-        dto.setTotalPenaltyAmount(penaltyAmount);
-        dto.setTotalEarnings(totalEarnings);
-        dto.setTotalDeductions(totalDeductions);
-        dto.setNetSalary(totalEarnings - totalDeductions);
         return dto;
     }
 
-    private Set<LocalDate> calculatePaidDays(java.util.Date startDate, java.util.Date endDate, WeeklyOff config) {
+//    private EmployeeSalaryStatementDto buildEmployeeSalaryStatement(CompanyEmployee companyEmployee, SalaryStatementRequestDto salaryStatementRequestDto) {
+//
+//        // Date range handling
+//        java.util.Date startDate, endDate;
+//        if (salaryStatementRequestDto.getStartDate() != null || salaryStatementRequestDto.getEndDate() != null) {
+//            startDate = this.commonService.convertStringToDate(salaryStatementRequestDto.getStartDate());
+//            endDate = this.commonService.convertStringToDate(salaryStatementRequestDto.getEndDate());
+//        } else {
+//            Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+//            calendar.set(Calendar.DAY_OF_MONTH, 1);
+//            startDate = calendar.getTime();
+//            calendar.add(Calendar.MONTH, 1);
+//            calendar.set(Calendar.DAY_OF_MONTH, 0);
+//            endDate = calendar.getTime();
+//
+//        }
+//        // Initialize DTO with basic employee info
+//        EmployeeSalaryStatementDto dto = new EmployeeSalaryStatementDto();
+//        dto.setEmployeeId(companyEmployee.getEmployeeId());
+//        dto.setCompanyId(companyEmployee.getCompanyDetails().getId());
+//        dto.setEmployeeName(companyEmployee.getFirstName() + " " + companyEmployee.getLastName());
+//
+//        if (companyEmployee.getBasicSalary() != null) {
+//            dto.setBasicSalary(companyEmployee.getBasicSalary());
+//        }
+//        if (companyEmployee.getDepartment() != null) {
+//            dto.setDepartmentId(companyEmployee.getDepartment().getId());
+//            dto.setDepartmentName(companyEmployee.getDepartment().getDepartmentName());
+//        }
+//
+//        // Get working day configuration
+//        WeeklyOff workingDayConfig = companyEmployee.getWeeklyOff();
+//        // Calculate all working days for the period (including paid weekly-offs)
+//        int totalPaidDays = 0;
+//        if (workingDayConfig != null) {
+//            Set<LocalDate> allPaidDays = new HashSet<>();
+//            allPaidDays = calculatePaidDays(startDate, endDate, workingDayConfig);
+//            totalPaidDays = allPaidDays.size();
+//        }
+//
+//        // Get actual attendance data
+//        Specification<UserInOut> userSpec = Specification.where(EmployeeStatementSpecification.hasUserIds(List.of(companyEmployee.getEmployeeId())))
+//                .and(UserInOutSpecification.createdOnGreaterThanEqual(startDate))
+//                .and(UserInOutSpecification.createdOnLessThanEqual(endDate))
+//                .and(UserInOutSpecification.isSalaryGenerate());
+//
+//        List<UserInOut> userInOutList = this.userInOutRepository.findAll(userSpec);
+//        if (userInOutList.isEmpty()) {
+//            return null;
+//        }
+//
+//        // Process attendance records
+//        Map<LocalDate, Long> dailyWorkedMinutes = new HashMap<>();
+//        Set<LocalDate> actualWorkDays = new HashSet<>();
+//        long totalWorkedMillis = 0;
+//        int penaltyAmount = 0;
+//        long workedMinutes = 0L;
+//
+//        for (UserInOut userInOut : userInOutList) {
+//            dto.setClockInOutId(userInOut.getId());
+//            Date timeIn = userInOut.getTimeIn() != null ? new Date(userInOut.getTimeIn().getTime()) : null;
+//            Date timeOut = userInOut.getTimeOut() != null ? new Date(userInOut.getTimeOut().getTime()) : null;
+//
+//            if (timeIn != null && timeOut != null) {
+//                long workedMillis = timeOut.getTime() - timeIn.getTime();
+//                totalWorkedMillis += workedMillis;
+//
+//                Instant instant = new java.util.Date(timeIn.getTime()).toInstant();
+//                LocalDate date = instant.atZone(ZoneId.systemDefault()).toLocalDate();
+//
+//                long workMinutes = workedMillis / (1000 * 60);
+//                workedMinutes = workedMinutes + workMinutes;
+//                dailyWorkedMinutes.merge(date, workMinutes, Long::sum);
+//                actualWorkDays.add(date);
+//
+//                // Calculate penalty amount
+//                if (companyEmployee.getLateEntryPenaltyRule()) {
+//                    if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
+//                        int latePenalty = calculateLateEntryPenalty(companyEmployee, userInOut.getTimeIn());
+//                        penaltyAmount += latePenalty;
+//                    }
+//                }
+//                if (companyEmployee.getEarlyExitPenaltyRule()) {
+//                    if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
+//                        int earlyPenalty = calculateEarlyExitPenalty(companyEmployee, userInOut.getTimeOut());
+//                        penaltyAmount += earlyPenalty;
+//                    }
+//                }
+//            }
+//        }
+//        if (companyEmployee.getHolidayTemplates() != null) {
+//            HolidayTemplatesDto holidayTemplate = this.holidayTemplatesService
+//                    .getHolidayTemplateById(companyEmployee.getHolidayTemplates().getId());
+//
+//            if (holidayTemplate != null && holidayTemplate.getHolidayTemplateDetailsList() != null
+//                    && !holidayTemplate.getHolidayTemplateDetailsList().isEmpty()) {
+//
+//                // ✅ DATE FIX (DD/MM/YYYY)
+//                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy, hh:mm:ss a", Locale.ENGLISH);
+//
+//                // Convert the requested range to LocalDate for comparison
+//                LocalDate rangeStart = startDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+//                LocalDate rangeEnd = endDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+//
+//                for (HolidayTemplateDetailsDto detail : holidayTemplate.getHolidayTemplateDetailsList()) {
+//                    String dateStr = detail.getDate();
+//                    if (dateStr != null && !dateStr.isBlank()) {
+//                        try {
+//                            LocalDate holidayDate = LocalDate.parse(dateStr, formatter);
+//
+//                            // NEW CHECK: Only add if the holiday is within the requested filter range
+//                            if (!holidayDate.isBefore(rangeStart) && !holidayDate.isAfter(rangeEnd)) {
+//                                actualWorkDays.add(holidayDate);
+//                            }
+//                        } catch (DateTimeParseException e) {
+//                            throw new RuntimeException("Invalid date in holiday template: " + dateStr, e);
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//        // Calculate overtime
+//        float employeeShiftHours = companyEmployee.getCompanyShift() != null ? companyEmployee.getCompanyShift().getTotalHours() : 0;
+//        long employeeWorkedMinutes = totalWorkedMillis / (1000 * 60);
+//        long totalWorkedMinutes = employeeWorkedMinutes - (actualWorkDays.size() * (companyEmployee.getLunchBreak() != null ? companyEmployee.getLunchBreak() : 0));
+//        float shiftMinutes = employeeShiftHours * 60L;
+////        System.out.println("============= Employee Shift Hours ============" + employeeShiftHours + " | Shift Minutes: " + shiftMinutes);
+////        System.out.println("============= Total Worked Minutes ============" + totalWorkedMinutes + " | Worked Minutes: " + employeeWorkedMinutes + " | Lunch Breaks Total: " + (actualWorkDays.size() * companyEmployee.getLunchBreak()));
+////        long otMinutes = Math.max(totalWorkedMinutes - (actualWorkDays.size() * shiftMinutes), 0);
+//        float otMinutes = Math.max(totalWorkedMinutes - shiftMinutes, 0);
+
+    /// /        System.out.println("============= otMinutes ================" + otMinutes);
+//        int otFinalMinutes = (int) otMinutes;
+//        int otAmountFinal = calculateOvertimeAmount(companyEmployee, otFinalMinutes);
+//
+//        // Calculate PF
+//        int pfAmount = calculatePfAmount(companyEmployee);
+//        if (companyEmployee.getPfPercentage() != null && companyEmployee.getPfPercentage() > 0) {
+//            dto.setPfPercentage(companyEmployee.getPfPercentage());
+//        } else {
+//            dto.setPfAmount(companyEmployee.getPfAmount());
+//        }
+//        dto.setTotalPfAmount(pfAmount > 1800 ? 1800 : pfAmount);
+//        pfAmount = pfAmount > 1800 ? 1800 : pfAmount;
+//
+//        // Calculate PT
+//        int ptAmount = Boolean.TRUE.equals(companyEmployee.getIsPt()) ? companyEmployee.getPtAmount() : 0;
+//        dto.setPtAmount(ptAmount);
+//
+//        // Calculate canteen deductions
+//        int otherDeductions = calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays) + penaltyAmount;
+//        int totalDeductions = pfAmount + ptAmount + otherDeductions;
+//
+//        // Calculate earnings
+//        long dailySalary = 0L;
+//        if (companyEmployee.getEmployeeType().getId() == 2 && companyEmployee.getHourlyRate() != null) {
+//            double workedHours = totalWorkedMinutes / 60.0;
+//            long roundedHours = (long) Math.ceil(workedHours);
+//            dailySalary = (long) (roundedHours * companyEmployee.getHourlyRate());
+//        } else {
+//            dailySalary = companyEmployee.getBasicSalary() / 30;
+//        }
+//        int baseSalary = (int) (dailySalary * (totalPaidDays + actualWorkDays.size()));
+//        int totalEarnings = baseSalary + otAmountFinal;
+//
+//
+//        System.out.println("============= Debugging Employee Salary Statement for Employee: ================" + companyEmployee.getUsername());
+//        System.out.println("Basic Salary: " + companyEmployee.getBasicSalary());
+//        System.out.println("Daily Salary: " + dailySalary);
+//        System.out.println("Start Date: " + startDate);
+//        System.out.println("End Date: " + endDate);
+//        System.out.println("Paid Days: " + totalPaidDays);
+//        System.out.println("Worked Days: " + actualWorkDays.size());
+//        System.out.println("Total Worked Days: " + (actualWorkDays.size() + totalPaidDays));
+//        System.out.println("Total Worked Minutes: " + totalWorkedMinutes);
+//        System.out.println("Overtime Minutes: " + otFinalMinutes);
+//        System.out.println("Overtime Amount: " + otAmountFinal);
+//        System.out.println("Total Earnings: " + totalEarnings);
+//        System.out.println("PF Amount: " + pfAmount);
+//        System.out.println("PT Amount: " + ptAmount);
+//        System.out.println("Penalty Amount: " + penaltyAmount);
+//        System.out.println("Other Deductions (Canteen + Penalty): " + otherDeductions);
+//        System.out.println("Total Deductions: " + totalDeductions);
+//        System.out.println("Net Salary: " + (totalEarnings - totalDeductions));
+//
+//        // Set all calculated values
+//        dto.setOverTime(otFinalMinutes);
+//        dto.setOtAmount(otAmountFinal);
+//        dto.setTotalPaidDays(totalPaidDays);
+//        dto.setTotalWorkingDays(actualWorkDays.size());
+//        dto.setTotalDays((actualWorkDays.size() + totalPaidDays));
+//        dto.setTotalEarnSalary(baseSalary);
+//        dto.setOtherDeductions(otherDeductions);
+//        dto.setTotalPenaltyAmount(penaltyAmount);
+//        dto.setTotalEarnings(totalEarnings);
+//        dto.setTotalDeductions(totalDeductions);
+//        dto.setNetSalary(totalEarnings - totalDeductions);
+//        return dto;
+//    }
+    private Set<LocalDate> calculatePaidDays(java.util.Date startDate, java.util.Date endDate, WeeklyOff config, List<String> holidayDates) {
         Set<LocalDate> paidDays = new HashSet<>();
 
-        Instant startInstant = startDate.toInstant();
-        Instant endInstant = endDate.toInstant();
+        LocalDate start = startDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate end = endDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
-        LocalDate start = startInstant.atZone(ZoneId.systemDefault()).toLocalDate();
-        LocalDate end = endInstant.atZone(ZoneId.systemDefault()).toLocalDate();
         for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
-            DayOfWeek dayOfWeek = date.getDayOfWeek();
-            int dayOfMonth = date.getDayOfMonth();
-            int weekOfMonth = (dayOfMonth - 1) / 7 + 1;
+            boolean isOffDay = false;
+            String formattedCurrentDate = date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
 
-            boolean isWorkingDay = false;
-
-            if (config != null) {
-                switch (dayOfWeek) {
-                    case SUNDAY:
-                        isWorkingDay = config.isSundayAll() ||
-                                (weekOfMonth == 1 && config.isSunday1st()) ||
-                                (weekOfMonth == 2 && config.isSunday2nd()) ||
-                                (weekOfMonth == 3 && config.isSunday3rd()) ||
-                                (weekOfMonth == 4 && config.isSunday4th()) ||
-                                (weekOfMonth == 5 && config.isSunday5th());
-                        break;
-                    case MONDAY:
-                        isWorkingDay = config.isMondayAll() ||
-                                (weekOfMonth == 1 && config.isMonday1st()) ||
-                                (weekOfMonth == 2 && config.isMonday2nd()) ||
-                                (weekOfMonth == 3 && config.isMonday3rd()) ||
-                                (weekOfMonth == 4 && config.isMonday4th()) ||
-                                (weekOfMonth == 5 && config.isMonday5th());
-                        break;
-                    case TUESDAY:
-                        isWorkingDay = config.isTuesdayAll() ||
-                                (weekOfMonth == 1 && config.isTuesday1st()) ||
-                                (weekOfMonth == 2 && config.isTuesday2nd()) ||
-                                (weekOfMonth == 3 && config.isTuesday3rd()) ||
-                                (weekOfMonth == 4 && config.isTuesday4th()) ||
-                                (weekOfMonth == 5 && config.isTuesday5th());
-                        break;
-                    case WEDNESDAY:
-                        isWorkingDay = config.isWednesdayAll() ||
-                                (weekOfMonth == 1 && config.isWednesday1st()) ||
-                                (weekOfMonth == 2 && config.isWednesday2nd()) ||
-                                (weekOfMonth == 3 && config.isWednesday3rd()) ||
-                                (weekOfMonth == 4 && config.isWednesday4th()) ||
-                                (weekOfMonth == 5 && config.isWednesday5th());
-                        break;
-                    case THURSDAY:
-                        isWorkingDay = config.isThursdayAll() ||
-                                (weekOfMonth == 1 && config.isThursday1st()) ||
-                                (weekOfMonth == 2 && config.isThursday2nd()) ||
-                                (weekOfMonth == 3 && config.isThursday3rd()) ||
-                                (weekOfMonth == 4 && config.isThursday4th()) ||
-                                (weekOfMonth == 5 && config.isThursday5th());
-                        break;
-                    case FRIDAY:
-                        isWorkingDay = config.isFridayAll() ||
-                                (weekOfMonth == 1 && config.isFriday1st()) ||
-                                (weekOfMonth == 2 && config.isFriday2nd()) ||
-                                (weekOfMonth == 3 && config.isFriday3rd()) ||
-                                (weekOfMonth == 4 && config.isFriday4th()) ||
-                                (weekOfMonth == 5 && config.isFriday5th());
-                        break;
-                    case SATURDAY:
-                        isWorkingDay = config.isSaturdayAll() ||
-                                (weekOfMonth == 1 && config.isSaturday1st()) ||
-                                (weekOfMonth == 2 && config.isSaturday2nd()) ||
-                                (weekOfMonth == 3 && config.isSaturday3rd()) ||
-                                (weekOfMonth == 4 && config.isSaturday4th()) ||
-                                (weekOfMonth == 5 && config.isSaturday5th());
-                        break;
-                }
+            // 1. Check if it's a Holiday
+            if (holidayDates != null && holidayDates.contains(formattedCurrentDate)) {
+                isOffDay = true;
             }
-            if (isWorkingDay) {
+
+            // 2. Check if it's a Weekly Off
+            if (!isOffDay && config != null) {
+                DayOfWeek dayOfWeek = date.getDayOfWeek();
+                int weekOfMonth = ((date.getDayOfMonth() - 1) / 7) + 1;
+
+                // Reusing your isWeeklyOffDay logic or the switch case
+                isOffDay = isWeeklyOffDay(dayOfWeek, weekOfMonth, config);
+            }
+
+            if (isOffDay) {
                 paidDays.add(date);
             }
         }
-
         return paidDays;
+    }
+
+    // Helper to keep calculatePaidDays clean (matching your existing switch logic)
+    private boolean isWeeklyOffDay(DayOfWeek dayOfWeek, int weekOfMonth, WeeklyOff config) {
+        return switch (dayOfWeek) {
+            case SUNDAY ->
+                    config.isSundayAll() || (weekOfMonth == 1 && config.isSunday1st()) || (weekOfMonth == 2 && config.isSunday2nd()) || (weekOfMonth == 3 && config.isSunday3rd()) || (weekOfMonth == 4 && config.isSunday4th()) || (weekOfMonth == 5 && config.isSunday5th());
+            case MONDAY ->
+                    config.isMondayAll() || (weekOfMonth == 1 && config.isMonday1st()) || (weekOfMonth == 2 && config.isMonday2nd()) || (weekOfMonth == 3 && config.isMonday3rd()) || (weekOfMonth == 4 && config.isMonday4th()) || (weekOfMonth == 5 && config.isMonday5th());
+            case TUESDAY ->
+                    config.isTuesdayAll() || (weekOfMonth == 1 && config.isTuesday1st()) || (weekOfMonth == 2 && config.isTuesday2nd()) || (weekOfMonth == 3 && config.isTuesday3rd()) || (weekOfMonth == 4 && config.isTuesday4th()) || (weekOfMonth == 5 && config.isTuesday5th());
+            case WEDNESDAY ->
+                    config.isWednesdayAll() || (weekOfMonth == 1 && config.isWednesday1st()) || (weekOfMonth == 2 && config.isWednesday2nd()) || (weekOfMonth == 3 && config.isWednesday3rd()) || (weekOfMonth == 4 && config.isWednesday4th()) || (weekOfMonth == 5 && config.isWednesday5th());
+            case THURSDAY ->
+                    config.isThursdayAll() || (weekOfMonth == 1 && config.isThursday1st()) || (weekOfMonth == 2 && config.isThursday2nd()) || (weekOfMonth == 3 && config.isThursday3rd()) || (weekOfMonth == 4 && config.isThursday4th()) || (weekOfMonth == 5 && config.isThursday5th());
+            case FRIDAY ->
+                    config.isFridayAll() || (weekOfMonth == 1 && config.isFriday1st()) || (weekOfMonth == 2 && config.isFriday2nd()) || (weekOfMonth == 3 && config.isFriday3rd()) || (weekOfMonth == 4 && config.isFriday4th()) || (weekOfMonth == 5 && config.isFriday5th());
+            case SATURDAY ->
+                    config.isSaturdayAll() || (weekOfMonth == 1 && config.isSaturday1st()) || (weekOfMonth == 2 && config.isSaturday2nd()) || (weekOfMonth == 3 && config.isSaturday3rd()) || (weekOfMonth == 4 && config.isSaturday4th()) || (weekOfMonth == 5 && config.isSaturday5th());
+            default -> false;
+        };
     }
 
     // Helper method to calculate overtime amount
@@ -577,581 +732,3 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
     }
 
 }
-
-
-//package com.timesheetspro_api.employeeStatements.serviceImpl;
-//
-//import java.math.BigDecimal;
-//import java.math.RoundingMode;
-//import java.sql.Timestamp;
-//import java.time.*;
-//
-//import com.timesheetspro_api.common.dto.employeeStatement.EmployeeSalaryStatementDto;
-//import com.timesheetspro_api.common.dto.employeeStatement.SalaryStatementRequestDto;
-//import com.timesheetspro_api.common.dto.holidayTemplateDetails.HolidayTemplateDetailsDto;
-//import com.timesheetspro_api.common.dto.holidayTemplates.HolidayTemplatesDto;
-//import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
-//import com.timesheetspro_api.common.model.UserInOut.UserInOut;
-//import com.timesheetspro_api.common.model.attendancePenaltyRules.AttendancePenaltyRules;
-//import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
-//import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
-//import com.timesheetspro_api.common.repository.OvertimeRulesRepository;
-//import com.timesheetspro_api.common.repository.UserInOutRepository;
-//import com.timesheetspro_api.common.repository.company.AttendancePenaltyRulesRepository;
-//import com.timesheetspro_api.common.repository.company.CompanyEmployeeRepository;
-//import com.timesheetspro_api.common.service.CommonService;
-//import com.timesheetspro_api.common.specification.EmployeeStatementSpecification;
-//import com.timesheetspro_api.common.specification.UserInOutSpecification;
-//import com.timesheetspro_api.employeeStatements.service.EmployeeSalaryStatementService;
-//import com.timesheetspro_api.holidayTemplates.service.HolidayTemplatesService;
-//import org.springframework.beans.factory.annotation.Autowired;
-//import org.springframework.data.jpa.domain.Specification;
-//import org.springframework.stereotype.Service;
-//
-//import java.sql.Date;
-//import java.time.format.DateTimeFormatter;
-//import java.time.format.DateTimeParseException;
-//import java.util.*;
-//
-//@Service(value = "EmployeeSalaryStatementService")
-//public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStatementService {
-//
-//    @Autowired
-//    private CompanyEmployeeRepository companyEmployeeRepository;
-//
-//    @Autowired
-//    private UserInOutRepository userInOutRepository;
-//
-//    @Autowired
-//    private OvertimeRulesRepository overtimeRulesRepository;
-//
-//    @Autowired
-//    private AttendancePenaltyRulesRepository attendancePenaltyRulesRepository;
-//
-//    @Autowired
-//    private CommonService commonService;
-//
-//    @Autowired
-//    private HolidayTemplatesService holidayTemplatesService;
-//
-//    @Override
-//    public List<EmployeeSalaryStatementDto> getEmployeeSalaryStatements(SalaryStatementRequestDto salaryStatementRequestDto) {
-//
-//        try {
-//            List<EmployeeSalaryStatementDto> salaryStatementList = new ArrayList<>();
-//            List<CompanyEmployee> companyEmployees;
-//            Specification<CompanyEmployee> spec = Specification.where(null);
-//
-//            boolean hasEmployeeFilter = salaryStatementRequestDto.getEmployeeIds() != null && !salaryStatementRequestDto.getEmployeeIds().isEmpty();
-//            boolean hasDepartmentFilter = salaryStatementRequestDto.getDepartmentIds() != null && !salaryStatementRequestDto.getDepartmentIds().isEmpty();
-//
-//            if (!hasEmployeeFilter && !hasDepartmentFilter) {
-//                companyEmployees = this.companyEmployeeRepository.findByCompanyId(salaryStatementRequestDto.getCompanyId());
-//            } else {
-//
-//                if (hasEmployeeFilter) {
-//                    spec = spec.and(EmployeeStatementSpecification.hasEmployeeIds(salaryStatementRequestDto.getEmployeeIds()));
-//                }
-//
-//                if (hasDepartmentFilter) {
-//                    spec = spec.and(EmployeeStatementSpecification.hasDepartmentIds(salaryStatementRequestDto.getDepartmentIds()));
-//                }
-//
-//                companyEmployees = this.companyEmployeeRepository.findAll(spec);
-//            }
-//
-//            for (CompanyEmployee employee : companyEmployees) {
-//                EmployeeSalaryStatementDto dto = buildEmployeeSalaryStatement(employee, salaryStatementRequestDto);
-//                if (dto != null) {
-//                    salaryStatementList.add(dto);
-//                }
-//            }
-//
-//            return salaryStatementList;
-//
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            throw new RuntimeException(e);
-//        }
-//    }
-//
-//    private EmployeeSalaryStatementDto buildEmployeeSalaryStatement(CompanyEmployee companyEmployee, SalaryStatementRequestDto salaryStatementRequestDto) {
-//
-//        // Date range handling
-//        java.util.Date startDate, endDate;
-//        if (salaryStatementRequestDto.getStartDate() != null || salaryStatementRequestDto.getEndDate() != null) {
-//            startDate = this.commonService.convertStringToDate(salaryStatementRequestDto.getStartDate());
-//            endDate = this.commonService.convertStringToDate(salaryStatementRequestDto.getEndDate());
-//        } else {
-//            Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-//            calendar.set(Calendar.DAY_OF_MONTH, 1);
-//            startDate = calendar.getTime();
-//            calendar.add(Calendar.MONTH, 1);
-//            calendar.set(Calendar.DAY_OF_MONTH, 0);
-//            endDate = calendar.getTime();
-//
-//        }
-//        // Initialize DTO with basic employee info
-//        EmployeeSalaryStatementDto dto = new EmployeeSalaryStatementDto();
-//        dto.setEmployeeId(companyEmployee.getEmployeeId());
-//        dto.setCompanyId(companyEmployee.getCompanyDetails().getId());
-//        dto.setEmployeeName(companyEmployee.getFirstName() + " " + companyEmployee.getLastName());
-//
-//        if (companyEmployee.getBasicSalary() != null) {
-//            dto.setBasicSalary(companyEmployee.getBasicSalary());
-//        }
-//        if (companyEmployee.getDepartment() != null) {
-//            dto.setDepartmentId(companyEmployee.getDepartment().getId());
-//            dto.setDepartmentName(companyEmployee.getDepartment().getDepartmentName());
-//        }
-//
-//        // Get working day configuration
-//        WeeklyOff workingDayConfig = companyEmployee.getWeeklyOff();
-//
-//        // Calculate all working days for the period (including paid weekly-offs)
-//        int totalPaidDays = 0;
-//        if (workingDayConfig != null) {
-//            Set<LocalDate> allPaidDays = new HashSet<>();
-//            allPaidDays = calculatePaidDays(startDate, endDate, workingDayConfig);
-//            totalPaidDays = allPaidDays.size();
-//        }
-//
-//        // Get actual attendance data
-//        Specification<UserInOut> userSpec = Specification.where(EmployeeStatementSpecification.hasUserIds(List.of(companyEmployee.getEmployeeId())))
-//                .and(UserInOutSpecification.createdOnGreaterThanEqual(startDate))
-//                .and(UserInOutSpecification.createdOnLessThanEqual(endDate))
-//                .and(UserInOutSpecification.isSalaryGenerate());
-//
-//        List<UserInOut> userInOutList = this.userInOutRepository.findAll(userSpec);
-//        if (userInOutList.isEmpty()) {
-//            return null;
-//        }
-//
-//        // Process attendance records
-//        Map<LocalDate, Long> dailyWorkedMinutes = new HashMap<>();
-//        Set<LocalDate> actualWorkDays = new HashSet<>();
-//        long totalWorkedMillis = 0;
-//        int penaltyAmount = 0;
-//        long workedMinutes = 0L;
-//
-//        for (UserInOut userInOut : userInOutList) {
-//            dto.setClockInOutId(userInOut.getId());
-//            Date timeIn = userInOut.getTimeIn() != null ? new Date(userInOut.getTimeIn().getTime()) : null;
-//            Date timeOut = userInOut.getTimeOut() != null ? new Date(userInOut.getTimeOut().getTime()) : null;
-//
-//            if (timeIn != null && timeOut != null) {
-//                long workedMillis = timeOut.getTime() - timeIn.getTime();
-//                totalWorkedMillis += workedMillis;
-//
-//                Instant instant = new java.util.Date(timeIn.getTime()).toInstant();
-//                LocalDate date = instant.atZone(ZoneId.systemDefault()).toLocalDate();
-//
-//                long workMinutes = workedMillis / (1000 * 60);
-//                workedMinutes = workedMinutes + workMinutes;
-//                dailyWorkedMinutes.merge(date, workMinutes, Long::sum);
-//                actualWorkDays.add(date);
-//
-//                // Calculate penalty amount
-//                if (companyEmployee.getLateEntryPenaltyRule()) {
-//                    if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
-//                        int latePenalty = calculateLateEntryPenalty(companyEmployee, userInOut.getTimeIn());
-//                        penaltyAmount += latePenalty;
-//                    }
-//                }
-//                if (companyEmployee.getEarlyExitPenaltyRule()) {
-//                    if (companyEmployee.getCompanyShift() != null && companyEmployee.getCompanyShift().getShiftType().equals("Time Based")) {
-//                        int earlyPenalty = calculateEarlyExitPenalty(companyEmployee, userInOut.getTimeOut());
-//                        penaltyAmount += earlyPenalty;
-//                    }
-//                }
-//            }
-//        }
-//        if (companyEmployee.getHolidayTemplates() != null) {
-//            HolidayTemplatesDto holidayTemplate = this.holidayTemplatesService
-//                    .getHolidayTemplateById(companyEmployee.getHolidayTemplates().getId());
-//
-//            if (holidayTemplate != null && holidayTemplate.getHolidayTemplateDetailsList() != null
-//                    && !holidayTemplate.getHolidayTemplateDetailsList().isEmpty()) {
-//
-//                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yyyy, hh:mm:ss a", Locale.ENGLISH);
-//
-//                // Convert the requested range to LocalDate for comparison
-//                LocalDate rangeStart = startDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-//                LocalDate rangeEnd = endDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-//
-//                for (HolidayTemplateDetailsDto detail : holidayTemplate.getHolidayTemplateDetailsList()) {
-//                    String dateStr = detail.getDate();
-//                    if (dateStr != null && !dateStr.isBlank()) {
-//                        try {
-//                            LocalDate holidayDate = LocalDate.parse(dateStr, formatter);
-//
-//                            // NEW CHECK: Only add if the holiday is within the requested filter range
-//                            if (!holidayDate.isBefore(rangeStart) && !holidayDate.isAfter(rangeEnd)) {
-//                                actualWorkDays.add(holidayDate);
-//                            }
-//                        } catch (DateTimeParseException e) {
-//                            throw new RuntimeException("Invalid date in holiday template: " + dateStr, e);
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//
-//        // Calculate overtime
-//        int employeeShiftHours = companyEmployee.getCompanyShift() != null ? companyEmployee.getCompanyShift().getTotalHours() : 0;
-//        long employeeWorkedMinutes = totalWorkedMillis / (1000 * 60);
-//        long totalWorkedMinutes = employeeWorkedMinutes - (actualWorkDays.size() * companyEmployee.getLunchBreak());
-//        long shiftMinutes = employeeShiftHours * 60L;
-/// /        System.out.println("============= Employee Shift Hours ============" + employeeShiftHours + " | Shift Minutes: " + shiftMinutes);
-/// /        System.out.println("============= Total Worked Minutes ============" + totalWorkedMinutes + " | Worked Minutes: " + employeeWorkedMinutes + " | Lunch Breaks Total: " + (actualWorkDays.size() * companyEmployee.getLunchBreak()));
-/// /        long otMinutes = Math.max(totalWorkedMinutes - (actualWorkDays.size() * shiftMinutes), 0);
-//        long otMinutes = Math.max(totalWorkedMinutes - shiftMinutes, 0);
-/// /        System.out.println("============= otMinutes ================" + otMinutes);
-//        int otFinalMinutes = (int) otMinutes;
-//        int otAmountFinal = calculateOvertimeAmount(companyEmployee, otFinalMinutes);
-//
-//        // Calculate PF
-//        int pfAmount = calculatePfAmount(companyEmployee);
-//        if (companyEmployee.getPfPercentage() != null && companyEmployee.getPfPercentage() > 0) {
-//            dto.setPfPercentage(companyEmployee.getPfPercentage());
-//        } else {
-//            dto.setPfAmount(companyEmployee.getPfAmount());
-//        }
-//        dto.setTotalPfAmount(pfAmount > 900 ? 900 : pfAmount);
-//        pfAmount = pfAmount > 900 ? 900 : pfAmount;
-//
-//        // Calculate PT
-//        int ptAmount = Boolean.TRUE.equals(companyEmployee.getIsPt()) ? companyEmployee.getPtAmount() : 0;
-//        dto.setPtAmount(ptAmount);
-//
-//        // Calculate canteen deductions
-//        int otherDeductions = calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays) + penaltyAmount;
-//        int totalDeductions = pfAmount + ptAmount + otherDeductions;
-//
-//        // Calculate earnings
-//        long dailySalary = 0L;
-//        if (companyEmployee.getEmployeeType().getId() == 2 && companyEmployee.getHourlyRate() != null) {
-//            double workedHours = totalWorkedMinutes / 60.0;
-//            long roundedHours = (long) Math.ceil(workedHours);
-//            dailySalary = (long) (roundedHours * companyEmployee.getHourlyRate());
-//        } else {
-//            dailySalary = companyEmployee.getBasicSalary() / 30;
-//        }
-//        int baseSalary = (int) (dailySalary * (totalPaidDays + actualWorkDays.size()));
-//        int totalEarnings = baseSalary + otAmountFinal;
-//
-//
-//        System.out.println("============= Debugging Employee Salary Statement for Employee: ================" + companyEmployee.getUsername());
-//        System.out.println("Basic Salary: " + companyEmployee.getBasicSalary());
-//        System.out.println("Daily Salary: " + dailySalary);
-//        System.out.println("Start Date: " + startDate);
-//        System.out.println("End Date: " + endDate);
-//        System.out.println("Paid Days: " + totalPaidDays);
-//        System.out.println("Worked Days: " + actualWorkDays.size());
-//        System.out.println("Total Worked Days: " + (actualWorkDays.size() + totalPaidDays));
-//        System.out.println("Total Worked Minutes: " + totalWorkedMinutes);
-//        System.out.println("Overtime Minutes: " + otFinalMinutes);
-//        System.out.println("Overtime Amount: " + otAmountFinal);
-//        System.out.println("Total Earnings: " + totalEarnings);
-//        System.out.println("PF Amount: " + pfAmount);
-//        System.out.println("PT Amount: " + ptAmount);
-//        System.out.println("Canteen Deductions: " + calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays));
-//        System.out.println("Penalty Amount: " + penaltyAmount);
-//        System.out.println("Other Deductions (Canteen + Penalty): " + otherDeductions);
-//        System.out.println("Total Deductions: " + totalDeductions);
-//        System.out.println("Net Salary: " + (totalEarnings - totalDeductions));
-//
-//        // Set all calculated values
-//        dto.setOverTime(otFinalMinutes);
-//        dto.setOtAmount(otAmountFinal);
-//        dto.setTotalPaidDays(totalPaidDays);
-//        dto.setTotalWorkingDays(actualWorkDays.size());
-//        dto.setTotalDays((actualWorkDays.size() + totalPaidDays));
-//        dto.setTotalEarnSalary(baseSalary);
-//        dto.setOtherDeductions(otherDeductions);
-//        dto.setTotalPenaltyAmount(penaltyAmount);
-//        dto.setTotalEarnings(totalEarnings);
-//        dto.setTotalDeductions(totalDeductions);
-//        dto.setNetSalary(totalEarnings - totalDeductions);
-//        return dto;
-//    }
-//
-//    private Set<LocalDate> calculatePaidDays(java.util.Date startDate, java.util.Date endDate, WeeklyOff config) {
-//        Set<LocalDate> paidDays = new HashSet<>();
-//
-//        Instant startInstant = startDate.toInstant();
-//        Instant endInstant = endDate.toInstant();
-//
-//        LocalDate start = startInstant.atZone(ZoneId.systemDefault()).toLocalDate();
-//        LocalDate end = endInstant.atZone(ZoneId.systemDefault()).toLocalDate();
-//        for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
-//            DayOfWeek dayOfWeek = date.getDayOfWeek();
-//            int dayOfMonth = date.getDayOfMonth();
-//            int weekOfMonth = (dayOfMonth - 1) / 7 + 1;
-//
-//            boolean isWorkingDay = false;
-//
-//            if (config != null) {
-//                switch (dayOfWeek) {
-//                    case SUNDAY:
-//                        isWorkingDay = config.isSundayAll() ||
-//                                (weekOfMonth == 1 && config.isSunday1st()) ||
-//                                (weekOfMonth == 2 && config.isSunday2nd()) ||
-//                                (weekOfMonth == 3 && config.isSunday3rd()) ||
-//                                (weekOfMonth == 4 && config.isSunday4th()) ||
-//                                (weekOfMonth == 5 && config.isSunday5th());
-//                        break;
-//                    case MONDAY:
-//                        isWorkingDay = config.isMondayAll() ||
-//                                (weekOfMonth == 1 && config.isMonday1st()) ||
-//                                (weekOfMonth == 2 && config.isMonday2nd()) ||
-//                                (weekOfMonth == 3 && config.isMonday3rd()) ||
-//                                (weekOfMonth == 4 && config.isMonday4th()) ||
-//                                (weekOfMonth == 5 && config.isMonday5th());
-//                        break;
-//                    case TUESDAY:
-//                        isWorkingDay = config.isTuesdayAll() ||
-//                                (weekOfMonth == 1 && config.isTuesday1st()) ||
-//                                (weekOfMonth == 2 && config.isTuesday2nd()) ||
-//                                (weekOfMonth == 3 && config.isTuesday3rd()) ||
-//                                (weekOfMonth == 4 && config.isTuesday4th()) ||
-//                                (weekOfMonth == 5 && config.isTuesday5th());
-//                        break;
-//                    case WEDNESDAY:
-//                        isWorkingDay = config.isWednesdayAll() ||
-//                                (weekOfMonth == 1 && config.isWednesday1st()) ||
-//                                (weekOfMonth == 2 && config.isWednesday2nd()) ||
-//                                (weekOfMonth == 3 && config.isWednesday3rd()) ||
-//                                (weekOfMonth == 4 && config.isWednesday4th()) ||
-//                                (weekOfMonth == 5 && config.isWednesday5th());
-//                        break;
-//                    case THURSDAY:
-//                        isWorkingDay = config.isThursdayAll() ||
-//                                (weekOfMonth == 1 && config.isThursday1st()) ||
-//                                (weekOfMonth == 2 && config.isThursday2nd()) ||
-//                                (weekOfMonth == 3 && config.isThursday3rd()) ||
-//                                (weekOfMonth == 4 && config.isThursday4th()) ||
-//                                (weekOfMonth == 5 && config.isThursday5th());
-//                        break;
-//                    case FRIDAY:
-//                        isWorkingDay = config.isFridayAll() ||
-//                                (weekOfMonth == 1 && config.isFriday1st()) ||
-//                                (weekOfMonth == 2 && config.isFriday2nd()) ||
-//                                (weekOfMonth == 3 && config.isFriday3rd()) ||
-//                                (weekOfMonth == 4 && config.isFriday4th()) ||
-//                                (weekOfMonth == 5 && config.isFriday5th());
-//                        break;
-//                    case SATURDAY:
-//                        isWorkingDay = config.isSaturdayAll() ||
-//                                (weekOfMonth == 1 && config.isSaturday1st()) ||
-//                                (weekOfMonth == 2 && config.isSaturday2nd()) ||
-//                                (weekOfMonth == 3 && config.isSaturday3rd()) ||
-//                                (weekOfMonth == 4 && config.isSaturday4th()) ||
-//                                (weekOfMonth == 5 && config.isSaturday5th());
-//                        break;
-//                }
-//            }
-//            if (isWorkingDay) {
-//                paidDays.add(date);
-//            }
-//        }
-//
-//        return paidDays;
-//    }
-//
-//    // Helper method to calculate overtime amount
-//    private int calculateOvertimeAmount(CompanyEmployee employee, int otMinutes) {
-//        if (otMinutes <= 0 || employee.getOvertimeRules() == null) {
-//            return 0;
-//        }
-//
-//        OvertimeRules rule = employee.getOvertimeRules();
-//        Float otPayPerSlab = rule.getOtAmount() != null ? rule.getOtAmount() : 0f;
-//        Integer dailySalary = 0;
-//
-//        if (employee.getEmployeeType().getId() == 2 && employee.getHourlyRate() != null) {
-//            dailySalary = (int) (employee.getCompanyShift().getTotalHours() * employee.getHourlyRate());
-//        } else {
-//            dailySalary = employee.getBasicSalary() / 30;
-//        }
-//        switch (rule.getOtType().trim().toLowerCase()) {
-//            case "fixed amount":
-//                return otPayPerSlab.intValue();
-//            case "fixed amount per hour":
-//                long otHours = (long) Math.ceil(otMinutes / 60.0);
-//                return (int) (otHours * otPayPerSlab);
-//            case "1 day salary":
-//                return dailySalary;
-//            case "1.5 day salary":
-//                return (int) (dailySalary * 1.5);
-//            case "2 day salary":
-//                return dailySalary * 2;
-//            case "2.5 day salary":
-//                return (int) (dailySalary * 2.5);
-//            case "3 day salary":
-//                return dailySalary * 3;
-//            default:
-//                return 0;
-//        }
-//    }
-//
-//    // Helper method to calculate PF amount
-//    private int calculatePfAmount(CompanyEmployee employee) {
-//        if (!Boolean.TRUE.equals(employee.getIsPf())) {
-//            return 0;
-//        }
-//
-//        if ("Percentage".equals(employee.getPfType())) {
-//            Integer pfPercentage = Optional.ofNullable(employee.getPfPercentage()).orElse(0);
-//            BigDecimal basicSalaryPerMonth = BigDecimal.valueOf(employee.getBasicSalary());
-/// /          BigDecimal basicSalaryPerDay = basicSalaryPerMonth.divide(BigDecimal.valueOf(30), 2, RoundingMode.HALF_UP);
-//            BigDecimal pfAmount = basicSalaryPerMonth
-//                    .multiply(BigDecimal.valueOf(pfPercentage))
-//                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-//            return pfAmount.intValue();
-//        } else if ("Fixed Amount".equals(employee.getPfType())) {
-//            return Optional.ofNullable(employee.getPfAmount()).orElse(0);
-//        }
-//        return 0;
-//    }
-//
-//    // Helper method to calculate canteen deductions
-//    private int calculateCanteenDeductions(CompanyEmployee employee, Map<LocalDate, Long> dailyWorkedMinutes, Set<LocalDate> workDays) {
-//        // Case 1: Office Type → flat amount
-//        if ("Office Type".equals(employee.getCanteenType())) {
-//            return employee.getCanteenAmount();
-//        } else if ("Labour Type".equals(employee.getCanteenType())) {
-//            int perDayAmount = employee.getCanteenAmount();
-//
-//            // Case 2: If workingHoursIncludeLunch is null → always 2x per day
-//            if (employee.getWorkingHoursIncludeLunch() == null) {
-//                return workDays.size() * perDayAmount * 2;
-//            }
-//
-//            // Case 3: Use threshold to decide heavy vs light day
-//            long threshold = (long) hhDotMmToMinutes(employee.getWorkingHoursIncludeLunch());
-//
-//            int heavyWorkingDays = 0;
-//            for (LocalDate date : workDays) {
-//                if (dailyWorkedMinutes.getOrDefault(date, 0L) > threshold) {
-//                    heavyWorkingDays++;
-//                }
-//            }
-//
-//            int lightDays = workDays.size() - heavyWorkingDays;
-//            return (lightDays * perDayAmount * 2) + (heavyWorkingDays * perDayAmount);
-//        } else {
-//            return 0;
-//        }
-//    }
-//
-//    // ===== Helper: compute penalty given a rule, day salary & shift hours
-//    private int computePenalty(AttendancePenaltyRules rule, int daySalary, int totalHours) {
-/// /        if (totalHours == null || totalHours <= 0) totalHours = 8; // fallback
-//        float perHourSalary = daySalary / (float) totalHours;
-//        perHourSalary = new BigDecimal(perHourSalary).setScale(2, RoundingMode.HALF_UP).floatValue();
-//        float perMinuteSalary = perHourSalary / 60f;
-//        perMinuteSalary = new BigDecimal(perMinuteSalary).setScale(2, RoundingMode.HALF_UP).floatValue();
-//
-//        return switch (rule.getDeductionType()) {
-//            case "Fixed Amount" -> rule.getAmount();
-//            case "5 Min Salary" -> (int) Math.round(perMinuteSalary * 5);
-//            case "15 Min Salary" -> (int) Math.round(perMinuteSalary * 15);
-//            case "30 Min Salary" -> (int) Math.round(perMinuteSalary * 30);
-//            case "1 Hour Salary" -> (int) Math.round(perHourSalary);
-//            case "Half Day Salary" -> daySalary / 2;
-//            case "1 Day Salary" -> daySalary;
-//            case "1.5 Day Salary" -> (int) Math.round(daySalary * 1.5);
-//            case "2 Day Salary" -> daySalary * 2;
-//            case "2.5 Day Salary" -> (int) Math.round(daySalary * 2.5);
-//            case "3 Day Salary" -> daySalary * 3;
-//            default -> 0;
-//        };
-//    }
-//
-//    // ===== Main: calculate LATE ENTRY penalty amount
-//    private int calculateLateEntryPenalty(CompanyEmployee employee, java.util.Date timeInDate) {
-//        Timestamp shiftStartTs = employee.getCompanyShift().getStartTime();
-//        if (shiftStartTs == null) return 0;
-//
-//        Integer basic = employee.getBasicSalary();
-//        if (basic == null || basic <= 0) return 0;
-//        int daySalary = basic / 30;
-//        Integer totalHours = employee.getCompanyShift().getTotalHours();
-//
-//        ZoneId zone = ZoneId.systemDefault();
-//        LocalDateTime actualIn = timeInDate.toInstant().atZone(zone).toLocalDateTime();
-//        LocalTime rawStart = shiftStartTs.toInstant().atZone(zone).toLocalTime();
-//
-//        if (rawStart.equals(LocalTime.MIDNIGHT) && actualIn.getHour() >= 12) {
-//            rawStart = LocalTime.NOON;
-//        }
-//
-//        LocalDateTime expectedStart = LocalDateTime.of(actualIn.toLocalDate(), rawStart);
-//        long lateMinutes = Duration.between(expectedStart, actualIn).toMinutes();
-//        if (lateMinutes <= 0) return 0;
-//        return pickAndApplyRule(employee, daySalary, totalHours, lateMinutes, false);
-//    }
-//
-//    // ===== Main: calculate EARLY EXIT penalty amount
-//    private int calculateEarlyExitPenalty(CompanyEmployee employee, java.util.Date timeOutDate) {
-//        Timestamp shiftEndTs = employee.getCompanyShift().getEndTime();
-//        if (shiftEndTs == null) return 0;
-//
-//        Integer basic = employee.getBasicSalary();
-//        if (basic == null || basic <= 0) return 0;
-//        int daySalary = basic / 30;
-//        Integer totalHours = employee.getCompanyShift().getTotalHours();
-//
-//        ZoneId zone = ZoneId.systemDefault();
-//        LocalDateTime actualOut = timeOutDate.toInstant().atZone(zone).toLocalDateTime();
-//        LocalTime rawEnd = shiftEndTs.toInstant().atZone(zone).toLocalTime();
-//
-//        if (rawEnd.equals(LocalTime.MIDNIGHT) && actualOut.getHour() <= 12) {
-//            rawEnd = LocalTime.NOON;
-//        }
-//
-//        LocalDateTime expectedEnd = LocalDateTime.of(actualOut.toLocalDate(), rawEnd);
-//        long earlyMinutes = Duration.between(actualOut, expectedEnd).toMinutes(); // reverse direction
-//        if (earlyMinutes <= 0) return 0;
-//        return pickAndApplyRule(employee, daySalary, totalHours, earlyMinutes, true);
-//    }
-//
-//    // ===== Shared: pick rule & apply
-//    private int pickAndApplyRule(CompanyEmployee employee, int daySalary, int totalHours, long diffMinutes, boolean type) {
-//        List<AttendancePenaltyRules> rules =
-//                attendancePenaltyRulesRepository.findByCompanyId(employee.getCompanyDetails().getId(), type);
-//        if (rules == null || rules.isEmpty()) return 0;
-//
-//        rules.sort(Comparator.comparingInt(AttendancePenaltyRules::getMinutes));
-//
-//        AttendancePenaltyRules chosenRule = null;
-//        for (AttendancePenaltyRules r : rules) {
-//            if (diffMinutes >= r.getMinutes()) {
-//                chosenRule = r; // keep last that satisfies
-//            } else if (chosenRule == null) {
-//                // fallback: if no smaller rule exists, pick the first greater one
-//                chosenRule = r;
-//            }
-//            // don’t break, so you get the best match
-//        }
-//        if (chosenRule == null) return 0;
-//
-//        return computePenalty(chosenRule, daySalary, totalHours);
-//    }
-//
-//    private int hhDotMmToMinutes(Object value) {
-//        if (value == null) return 0;
-//
-//        double val = Double.parseDouble(value.toString());
-//        int hours = (int) val;
-//        // Get the decimal part, round to 2 decimal places to avoid floating point errors
-//        int minutes = (int) Math.round((val - hours) * 100);
-//
-//        if (minutes < 0 || minutes > 59) {
-//            throw new IllegalArgumentException("Invalid minutes: " + minutes);
-//        }
-//        return (hours * 60) + minutes;
-//    }
-//
-//}

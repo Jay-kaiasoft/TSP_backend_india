@@ -321,8 +321,17 @@ public class CommonServiceImpl implements CommonService {
 
     @Override
     public String convertDateToString(Date date) {
+        return convertDateToString(date, "UTC");
+    }
+
+    @Override
+    public String convertDateToString(Date date, String timeZone) {
+        if (date == null) return null;
         SimpleDateFormat dateFormat =
                 new SimpleDateFormat("dd/MM/yyyy, hh:mm:ss a", Locale.ENGLISH);
+        if (timeZone != null && !timeZone.isEmpty()) {
+            dateFormat.setTimeZone(TimeZone.getTimeZone(timeZone));
+        }
         return dateFormat.format(date);
     }
 

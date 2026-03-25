@@ -40,6 +40,7 @@ public interface CommonService {
     Date convertLocalToUtc(String localDate, String timeZone, boolean hasTime);
 
     String convertDateToString(Date date);
+    String convertDateToString(Date date, String timeZone);
 
     boolean sendEmail(String toEmail, String subject, String body);
 }
