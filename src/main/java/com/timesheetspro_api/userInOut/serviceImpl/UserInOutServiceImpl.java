@@ -121,7 +121,7 @@ public class UserInOutServiceImpl implements UserInOutService {
     @Override
     public Map<String, Object> getAllEntriesGroupByUser(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds, Integer companyId) {
         try {
-//            // --- Date handling: obtain UTC Date objects and corresponding local dates ---
+            //            // --- Date handling: obtain UTC Date objects and corresponding local dates ---
 //            Date startUTC, endUTC;
 //            LocalDate startLocal, endLocal;
 //
@@ -172,7 +172,6 @@ public class UserInOutServiceImpl implements UserInOutService {
 //
 //            // --- Build the list of all dates in the range (inclusive) ---
 //            List<LocalDate> dateRange = startLocal.datesUntil(endLocal.plusDays(1)).collect(Collectors.toList());
-
 
             ZoneId zone = ZoneId.of(timeZone);
             Instant startInstant, endInstant;
@@ -265,7 +264,7 @@ public class UserInOutServiceImpl implements UserInOutService {
                     entryByDate.put(date, uio);
                 }
 
-                // --- Pre-fetch Holidays (Do this BEFORE the dateRange loop) ---
+                // --- Pre-fetch Holidays (unchanged) ---
                 List<String> holidayDates = new ArrayList<>();
                 List<HolidayTemplates> holidayTemplates = this.holidayTemplatesRepository.findByCompanyId(user.getCompanyDetails().getId());
 
@@ -274,8 +273,6 @@ public class UserInOutServiceImpl implements UserInOutService {
                         List<HolidayTemplateDetailsDto> dtoList = this.holidayTemplateDetailsService.getAllHolidayTemplateDetailsByTemplateId(template.getId());
                         if (dtoList != null && !dtoList.isEmpty()) {
                             for (HolidayTemplateDetailsDto dto : dtoList) {
-                                // Assuming dto.getDate() returns "18/03/2026, 12:00:00 AM"
-                                // Extract just the "18/03/2026" part for easy matching
                                 if (dto.getDate() != null && dto.getDate().length() >= 10) {
                                     holidayDates.add(dto.getDate().substring(0, 10));
                                 }
@@ -285,6 +282,12 @@ public class UserInOutServiceImpl implements UserInOutService {
                 }
 
                 WeeklyOff weeklyOff = user.getWeeklyOff();
+
+                // --- Initialize counters for P, A, Weekly Off, Holiday ---
+                int presentCount = 0;      // P (present on normal days)
+                int absentCount = 0;        // A (absent on normal days)
+                int weeklyOffCount = 0;     // total weekly off days (whether worked or not)
+                int holidayCount = 0;       // total holiday days (whether worked or not)
 
                 // --- Build the "data" array for all dates in the range ---
                 List<Map<String, Object>> dataList = new ArrayList<>();
@@ -297,23 +300,36 @@ public class UserInOutServiceImpl implements UserInOutService {
                     Map<String, Object> dataItem = new HashMap<>();
 
                     // 1. Determine if today is a Holiday or a Weekly Off
-                    boolean isOffDay = false;
+                    boolean isHoliday = false;
+                    boolean isWeeklyOff = false;
                     String formattedCurrentDate = date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
 
-                    // Check if the current date is in our pre-fetched holidays list
+                    // Check if the current date is a holiday
                     if (holidayDates.contains(formattedCurrentDate)) {
-                        isOffDay = true;
+                        isHoliday = true;
                     }
 
-                    // Check if the current date falls under the Weekly Off rules
-                    if (!isOffDay && weeklyOff != null) {
+                    // Check if the current date falls under the Weekly Off rules (only if not already a holiday)
+                    if (!isHoliday && weeklyOff != null) {
                         DayOfWeek dayOfWeek = date.getDayOfWeek();
                         int weekOfMonth = ((date.getDayOfMonth() - 1) / 7) + 1; // Returns 1, 2, 3, 4, or 5
-                        isOffDay = isWeeklyOffDay(dayOfWeek, weekOfMonth, weeklyOff);
+                        isWeeklyOff = isWeeklyOffDay(dayOfWeek, weekOfMonth, weeklyOff);
                     }
 
-                    if (uio != null && uio.getTimeIn() != null && uio.getTimeOut() != null) {
-                        // --- Present day with valid times ---
+                    // Update counters for weekly off and holiday (count each day only once)
+                    if (isHoliday) {
+                        holidayCount++;
+                    }
+                    if (isWeeklyOff) {
+                        weeklyOffCount++;
+                    }
+
+                    // 2. Determine status and update present/absent counters
+                    boolean hasValidTimes = (uio != null && uio.getTimeIn() != null && uio.getTimeOut() != null);
+                    String status;
+
+                    if (hasValidTimes) {
+                        // Present day with valid times
                         Date timeIn = uio.getTimeIn();
                         Date timeOut = uio.getTimeOut();
                         long diffMs = timeOut.getTime() - timeIn.getTime();
@@ -335,12 +351,16 @@ public class UserInOutServiceImpl implements UserInOutService {
                         dataItem.put("overtime", formatMinutesToHHmm(overtimeMinutes));
                         dataItem.put("totalHours", formatMinutesToHHmm(grossMinutes));
 
-                        // If it's an off day and they worked = "PW" (Present on Weekly Off/Holiday)
-                        // If it's a normal day and they worked = "P" (Present)
-                        dataItem.put("status", isOffDay ? "PW" : "P");
-                        dataItem.put("userName", user.getFirstName() + " " + user.getLastName());
+                        // Determine status
+                        if (isHoliday || isWeeklyOff) {
+                            status = "PW";   // Present on Weekly Off/Holiday
+                            presentCount++;  // Count only normal day present
+                        } else {
+                            status = "P";    // Present on normal day
+                            presentCount++;  // Count only normal day present
+                        }
                     } else {
-                        // --- Absent or incomplete day ---
+                        // Absent or incomplete day
                         ZonedDateTime zdt = date.atStartOfDay(ZoneId.of(timeZone));
                         Date createdOnDate = Date.from(zdt.toInstant());
 
@@ -355,18 +375,30 @@ public class UserInOutServiceImpl implements UserInOutService {
                         dataItem.put("overtime", "00:00");
                         dataItem.put("totalHours", "00:00");
 
-                        // If it's an off day and they didn't work = "W" (Weekly Off/Holiday)
-                        // If it's a normal day and they didn't work = "A" (Absent)
-                        dataItem.put("status", isOffDay ? "W" : "A");
-                        dataItem.put("userName", user.getFirstName() + " " + user.getLastName());
+                        // Determine status
+                        if (isHoliday || isWeeklyOff) {
+                            status = "W";    // Weekly Off/Holiday (absent)
+                        } else {
+                            status = "A";    // Absent on normal day
+                            absentCount++;   // Count only normal day absence
+                        }
                     }
+
+                    dataItem.put("status", status);
+                    dataItem.put("userName", user.getFirstName() + " " + user.getLastName());
                     dataItem.put("rowId", rowIndex++);
                     dataList.add(dataItem);
                 }
-                // --- Build user group object with totals ---
+
+                // --- Build user group object with totals and new counters ---
                 Map<String, Object> userGroup = new HashMap<>();
                 userGroup.put("id", user.getEmployeeId());
                 userGroup.put("username", user.getFirstName() + " " + user.getLastName());
+                // Add the new counters right after username
+                userGroup.put("presentCount", presentCount);      // P
+                userGroup.put("absentCount", absentCount);        // A
+                userGroup.put("weeklyOffCount", weeklyOffCount);  // Weekly Off days
+                userGroup.put("holidayCount", holidayCount);      // Holiday days
                 userGroup.put("department", user.getDepartment().getDepartmentName());
                 userGroup.put("data", dataList);
                 userGroup.put("totalHours", formatMinutesToHHmm(totalGrossMinutes));
@@ -388,7 +420,7 @@ public class UserInOutServiceImpl implements UserInOutService {
     @Override
     public List<UserInOutDto> getAllEntriesByUserId(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds, Integer companyId) {
         try {
-            // --- Date handling using java.time ---
+//            // --- Date handling using java.time ---
             ZoneId zone = ZoneId.of(timeZone);
             Instant startInstant, endInstant;
 
@@ -432,6 +464,31 @@ public class UserInOutServiceImpl implements UserInOutService {
 
             // --- Fetch raw entries (unchanged) ---
             List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
+
+//            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+//            dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+//            Date start, end;
+//            if (startDate == null || endDate == null) {
+//                Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+//                calendar.set(Calendar.DAY_OF_MONTH, 1);
+//                start = calendar.getTime();
+//                calendar.add(Calendar.MONTH, 1);
+//                calendar.set(Calendar.DAY_OF_MONTH, 0);
+//                end = calendar.getTime();
+//            }else{
+//                start = this.commonService.convertLocalToUtc(startDate, timeZone, false);
+//                end = this.commonService.convertLocalToUtc(endDate, timeZone, true);
+//            }
+//            // --- Build specification ---
+//            Specification<UserInOut> spec = UserInOutSpecification.createdOnGreaterThanEqual(start);
+//            if (userIds != null && !userIds.isEmpty()) {
+//                spec = spec.and(UserInOutSpecification.userIdIn(userIds));
+//            }
+//            if (companyId != null) {
+//                spec = spec.and(UserInOutSpecification.hasCompany(companyId));
+//            }
+//            spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(end));
+//            List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
 
 
             // --- Collect distinct user IDs from the entries ---

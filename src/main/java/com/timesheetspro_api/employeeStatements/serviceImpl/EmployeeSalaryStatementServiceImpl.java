@@ -237,16 +237,21 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         int totalDeductions = pfAmount + ptAmount + otherDeductions;
 
         // 8. Earnings
+        int baseSalary = 0;
         long dailySalary = 0L;
-        if (companyEmployee.getEmployeeType().getId() == 2 && companyEmployee.getHourlyRate() != null) {
+        boolean isHourly = companyEmployee.getEmployeeType().getId() == 2 && companyEmployee.getHourlyRate() != null;
+
+        if (isHourly) {
             double workedHours = netWorkedMinutes / 60.0;
-            dailySalary = (long) (Math.ceil(workedHours) * companyEmployee.getHourlyRate());
+            System.out.println("========= workedHours =========" + workedHours);
+            baseSalary = (int) (Math.ceil(workedHours) * companyEmployee.getHourlyRate());
+            System.out.printf("=========== dailySalary =======" + dailySalary);
         } else {
             dailySalary = companyEmployee.getBasicSalary() / 30;
         }
 
         // Base Salary uses (Standard Unworked Paid Days + Days they physically came in)
-        int baseSalary = (int) (dailySalary * (totalPaidDaysCount + actualWorkDays.size()));
+        baseSalary = isHourly ? baseSalary : (int) (dailySalary * (totalPaidDaysCount + actualWorkDays.size()));
         int totalEarnings = baseSalary + otAmountFinal;
 
         // 9. Set DTO values
