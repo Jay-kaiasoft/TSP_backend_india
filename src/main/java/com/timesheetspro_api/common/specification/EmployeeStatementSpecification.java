@@ -9,6 +9,10 @@ import java.util.List;
 
 public class EmployeeStatementSpecification {
 
+    public static Specification<UserInOut> matchCreatedOn(Date date) {
+        return (root, query, cb) -> cb.equal(root.get("createdOn"), date);
+    }
+
     public static Specification<UserInOut> betweenCreatedOn(Date startDate, Date endDate) {
         return (root, query, cb) -> cb.between(root.get("createdOn"), startDate, endDate);
     }

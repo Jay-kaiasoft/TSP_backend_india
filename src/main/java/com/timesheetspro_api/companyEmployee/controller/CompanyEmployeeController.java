@@ -31,11 +31,11 @@ public class CompanyEmployeeController {
         }
     }
 
-    @GetMapping("/getEmployeePFAndPTReport/{companyId}/{type}/{month}")
-    public ApiResponse<?> getEmployeePFAndPTReport(@PathVariable int companyId, @PathVariable String type,@PathVariable String month) {
+    @GetMapping("/getEmployeePFAndPTReport")
+    public ApiResponse<?> getEmployeePFAndPTReport(@RequestParam(required = true) int companyId, @RequestParam(required = true) String type, @RequestParam(required = true) String month, @RequestParam(required = true) String userTimeZone) {
         Map<String, Object> resBody = new HashMap<>();
         try {
-            List<Map<String, Object>> companyEmployeeDtoList = this.companyEmployeeService.getReports(companyId, type,Integer.parseInt(month));
+            List<Map<String, Object>> companyEmployeeDtoList = this.companyEmployeeService.getReports(companyId, type, Integer.parseInt(month), userTimeZone);
             return new ApiResponse<>(HttpStatus.OK.value(), "Fetch employee details successfully", companyEmployeeDtoList);
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to fetch company details", resBody);
@@ -46,7 +46,7 @@ public class CompanyEmployeeController {
     public ApiResponse<?> getAllEmployeeListByCompanyId(@PathVariable int companyId) {
         Map<String, Object> resBody = new HashMap<>();
         try {
-            List<Map<String, Object>>  companyEmployeeDtoList = this.companyEmployeeService.getAllEmployeeListByCompanyId(companyId);
+            List<Map<String, Object>> companyEmployeeDtoList = this.companyEmployeeService.getAllEmployeeListByCompanyId(companyId);
             return new ApiResponse<>(HttpStatus.OK.value(), "Fetch employee details successfully", companyEmployeeDtoList);
         } catch (Exception e) {
             return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Fail to fetch company details", resBody);

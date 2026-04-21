@@ -121,91 +121,36 @@ public class UserInOutServiceImpl implements UserInOutService {
     @Override
     public Map<String, Object> getAllEntriesGroupByUser(List<Integer> userIds, String startDate, String endDate, String timeZone, List<Integer> locationIds, List<Integer> departmentIds, Integer companyId) {
         try {
-            //            // --- Date handling: obtain UTC Date objects and corresponding local dates ---
-//            Date startUTC, endUTC;
-//            LocalDate startLocal, endLocal;
-//
-//            if (startDate == null || endDate == null) {
-//                // Default to current month in UTC
-//                Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-//                calendar.set(Calendar.DAY_OF_MONTH, 1);
-//                startUTC = calendar.getTime();
-//                calendar.add(Calendar.MONTH, 1);
-//                calendar.set(Calendar.DAY_OF_MONTH, 0);
-//                endUTC = new Date(); // Current time
-//
-//                // Convert UTC dates to local dates using the given time zone
-//                startLocal = startUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
-//                endLocal = endUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
-//            } else {
-//                // Use commonService to convert input strings to UTC Date (handles any extra characters)
-//                startUTC = this.commonService.convertLocalToUtc(startDate, timeZone, false);
-//                endUTC = this.commonService.convertLocalToUtc(endDate, timeZone, true);
-//
-//                // Derive local dates from the UTC results
-//                startLocal = startUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
-//                endLocal = endUTC.toInstant().atZone(ZoneId.of(timeZone)).toLocalDate();
-//            }
-//
-//            // --- Build specification with filters (unchanged) ---
-//            Specification<UserInOut> spec = UserInOutSpecification.createdOnGreaterThanEqual(startUTC);
-//            if (userIds != null && !userIds.isEmpty()) {
-//                spec = spec.and(UserInOutSpecification.userIdIn(userIds));
-//            }
-//            if (locationIds != null && !locationIds.isEmpty()) {
-//                spec = spec.and(UserInOutSpecification.hasLocationId(locationIds));
-//            }
-//            if (departmentIds != null && !departmentIds.isEmpty()) {
-//                spec = spec.and(UserInOutSpecification.hasDepartmentIds(departmentIds));
-//            }
-//            if (companyId != null) {
-//                spec = spec.and(UserInOutSpecification.hasCompany(companyId));
-//            }
-//            spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(endUTC));
-//
-//            // --- Fetch data from repository ---
-//            List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
-//
-//            // --- Group by User entity ---
-//            Map<CompanyEmployee, List<UserInOut>> groupedByUser = userInOutList.stream()
-//                    .collect(Collectors.groupingBy(UserInOut::getUser));
-//
-//            // --- Build the list of all dates in the range (inclusive) ---
-//            List<LocalDate> dateRange = startLocal.datesUntil(endLocal.plusDays(1)).collect(Collectors.toList());
-
             ZoneId zone = ZoneId.of(timeZone);
             Instant startInstant, endInstant;
-            LocalDate startLocal, endLocal;
+            LocalDate startLocal = null;
+            LocalDate endLocal = null;
 
             if (startDate == null || endDate == null) {
                 // Default: current month in UTC
                 ZoneId utc = ZoneId.of("UTC");
                 LocalDate now = LocalDate.now(utc);
-                startLocal = now.withDayOfMonth(1);
+                LocalDate firstOfMonth = now.withDayOfMonth(1);
+
+                // Assign local dates (needed for dateRange later)
+                startLocal = firstOfMonth;
                 endLocal = now;
 
-                ZonedDateTime startZdt = startLocal.atStartOfDay(utc);
-                ZonedDateTime endZdt = endLocal.atTime(LocalTime.MAX).atZone(utc);
+                ZonedDateTime startZdt = firstOfMonth.atStartOfDay(utc);
+                ZonedDateTime endZdt = now.atTime(LocalTime.MAX).atZone(utc);
                 startInstant = startZdt.toInstant();
                 endInstant = endZdt.toInstant();
-
-                // Convert to local timezone for display range
-                startLocal = startInstant.atZone(zone).toLocalDate();
-                endLocal = endInstant.atZone(zone).toLocalDate();
             } else {
                 startLocal = parseDateString(startDate);
                 endLocal = parseDateString(endDate);
 
-                // Start of day in given timezone
                 ZonedDateTime startZdt = startLocal.atStartOfDay(zone);
-                startInstant = startZdt.toInstant();
-
-                // End of day in given timezone
                 ZonedDateTime endZdt = endLocal.atTime(LocalTime.MAX).atZone(zone);
+
+                startInstant = startZdt.toInstant();
                 endInstant = endZdt.toInstant();
             }
 
-            // Convert to java.util.Date for specification (if needed)
             Date startUTC = Date.from(startInstant);
             Date endUTC = Date.from(endInstant);
 
@@ -226,7 +171,8 @@ public class UserInOutServiceImpl implements UserInOutService {
             spec = spec.and(UserInOutSpecification.createdOnLessThanEqual(endUTC));
 
             // --- Fetch data from repository (unchanged) ---
-            List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
+//            List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "id"));
+            List<UserInOut> userInOutList = this.userInOutRepository.findAll(spec);
 
             // --- Group by User entity (unchanged) ---
             Map<CompanyEmployee, List<UserInOut>> groupedByUser = userInOutList.stream()
@@ -376,8 +322,10 @@ public class UserInOutServiceImpl implements UserInOutService {
                         dataItem.put("totalHours", "00:00");
 
                         // Determine status
-                        if (isHoliday || isWeeklyOff) {
-                            status = "W";    // Weekly Off/Holiday (absent)
+                        if (isWeeklyOff) {
+                            status = "W";    // Weekly Off (absent)
+                        } else if (isHoliday) {
+                            status = "H";    // Holiday (absent)
                         } else {
                             status = "A";    // Absent on normal day
                             absentCount++;   // Count only normal day absence
@@ -1314,54 +1262,104 @@ public class UserInOutServiceImpl implements UserInOutService {
         }
     }
 
+//    private boolean handleTimeOutUpdate(CompanyEmployee employee, UserInOut existingRecord,
+//                                        Date timeOut, Integer locationId, Integer companyId) {
+//
+//        // 2️⃣ For Hourly shifts, check if autoTimeInAfter is present
+//        String autoTimeInAfter = employee.getCompanyDetails().getAutoTimeInAfterHours();
+//        if (autoTimeInAfter == null || autoTimeInAfter.isEmpty()) {
+//            // No gap limit defined → just update
+//            existingRecord.setTimeOut(timeOut);
+//            userInOutRepository.save(existingRecord);
+//            return true;
+//        }
+//
+//        // 3️⃣ Gap logic for Hourly shifts with autoTimeInAfter
+//        Instant timeOutInstant = timeOut.toInstant();
+//        LocalDateTime timeOutUtc = LocalDateTime.ofInstant(timeOutInstant, ZoneOffset.UTC);
+//
+//        // Get shift start/end times (assumed stored as UTC timestamps, but treated as local time)
+//        LocalTime shiftStart = employee.getCompanyShift().getStartTime().toLocalDateTime().toLocalTime();
+//        LocalTime shiftEnd = employee.getCompanyShift().getEndTime().toLocalDateTime().toLocalTime();
+//
+//        LocalDate date = timeOutUtc.toLocalDate();
+//        LocalDateTime shiftStartDateTime = LocalDateTime.of(date, shiftStart);
+//        LocalDateTime shiftEndDateTime = LocalDateTime.of(date, shiftEnd);
+//
+//        // Handle shifts that cross midnight
+//        if (shiftEnd.isBefore(shiftStart)) {
+//            if (timeOutUtc.toLocalTime().isBefore(shiftEnd)) {
+//                shiftStartDateTime = shiftStartDateTime.minusDays(1);
+//            } else {
+//                shiftEndDateTime = shiftEndDateTime.plusDays(1);
+//            }
+//        }
+//
+//        // Parse allowed gap duration from autoTimeInAfter (format "HH:mm")
+//        String[] parts = autoTimeInAfter.split(":");
+//        int hours = Integer.parseInt(parts[0]);
+//        int minutes = Integer.parseInt(parts[1]);
+//        Duration allowedDuration = Duration.ofHours(hours).plusMinutes(minutes);
+//
+//        Duration gap = Duration.between(shiftEndDateTime, timeOutUtc);
+//
+//        if (!gap.isNegative() && gap.compareTo(allowedDuration) > 0) {
+//            // Gap exceeded → create new record for next day with timeIn = timeOut + 1 day
+//            Date nextDayTimeIn = Date.from(timeOutInstant.plusSeconds(24 * 60 * 60));
+//            createUserInOut(employee.getEmployeeId(), locationId, companyId, nextDayTimeIn);
+//            return true; // existing record not updated
+//        } else {
+//            // Within allowed gap → update existing record
+//            existingRecord.setTimeOut(timeOut);
+//            userInOutRepository.save(existingRecord);
+//            return true;
+//        }
+//    }
+
     private boolean handleTimeOutUpdate(CompanyEmployee employee, UserInOut existingRecord,
                                         Date timeOut, Integer locationId, Integer companyId) {
 
-        // 2️⃣ For Hourly shifts, check if autoTimeInAfter is present
         String autoTimeInAfter = employee.getCompanyDetails().getAutoTimeInAfterHours();
+
+        // 1️⃣ If no limit is defined, just update the existing record
         if (autoTimeInAfter == null || autoTimeInAfter.isEmpty()) {
-            // No gap limit defined → just update
             existingRecord.setTimeOut(timeOut);
             userInOutRepository.save(existingRecord);
             return true;
         }
 
-        // 3️⃣ Gap logic for Hourly shifts with autoTimeInAfter
-        Instant timeOutInstant = timeOut.toInstant();
-        LocalDateTime timeOutUtc = LocalDateTime.ofInstant(timeOutInstant, ZoneOffset.UTC);
+        // 2️⃣ Convert UTC timeIn and current timeOut to IST (Asia/Kolkata)
+        ZoneId istZone = ZoneId.of("Asia/Kolkata");
 
-        // Get shift start/end times (assumed stored as UTC timestamps, but treated as local time)
-        LocalTime shiftStart = employee.getCompanyShift().getStartTime().toLocalDateTime().toLocalTime();
-        LocalTime shiftEnd = employee.getCompanyShift().getEndTime().toLocalDateTime().toLocalTime();
+        // timeIn from DB (UTC) to IST
+        ZonedDateTime timeInIst = existingRecord.getTimeIn().toInstant()
+                .atZone(ZoneId.of("UTC"))
+                .withZoneSameInstant(istZone);
 
-        LocalDate date = timeOutUtc.toLocalDate();
-        LocalDateTime shiftStartDateTime = LocalDateTime.of(date, shiftStart);
-        LocalDateTime shiftEndDateTime = LocalDateTime.of(date, shiftEnd);
+        // current timeOut (passed as param) to IST
+        ZonedDateTime timeOutIst = timeOut.toInstant()
+                .atZone(ZoneId.of("UTC"))
+                .withZoneSameInstant(istZone);
 
-        // Handle shifts that cross midnight
-        if (shiftEnd.isBefore(shiftStart)) {
-            if (timeOutUtc.toLocalTime().isBefore(shiftEnd)) {
-                shiftStartDateTime = shiftStartDateTime.minusDays(1);
-            } else {
-                shiftEndDateTime = shiftEndDateTime.plusDays(1);
-            }
-        }
-
-        // Parse allowed gap duration from autoTimeInAfter (format "HH:mm")
+        // 3️⃣ Parse allowed gap duration (format "HH:mm")
         String[] parts = autoTimeInAfter.split(":");
-        int hours = Integer.parseInt(parts[0]);
-        int minutes = Integer.parseInt(parts[1]);
-        Duration allowedDuration = Duration.ofHours(hours).plusMinutes(minutes);
+        int limitHours = Integer.parseInt(parts[0]);
+        int limitMinutes = Integer.parseInt(parts[1]);
+        Duration allowedLimit = Duration.ofHours(limitHours).plusMinutes(limitMinutes);
 
-        Duration gap = Duration.between(shiftEndDateTime, timeOutUtc);
+        // 4️⃣ Calculate current session duration
+        Duration sessionDuration = Duration.between(timeInIst, timeOutIst);
 
-        if (!gap.isNegative() && gap.compareTo(allowedDuration) > 0) {
-            // Gap exceeded → create new record for next day with timeIn = timeOut + 1 day
-            Date nextDayTimeIn = Date.from(timeOutInstant.plusSeconds(24 * 60 * 60));
+        // 5️⃣ Check if session duration exceeds the limit
+        if (!sessionDuration.isNegative() && sessionDuration.compareTo(allowedLimit) > 0) {
+            // Gap exceeded → create new record for next day (timeOut + 24 hours)
+            Instant nextDayInstant = timeOut.toInstant().plus(Duration.ofDays(1));
+            Date nextDayTimeIn = Date.from(nextDayInstant);
+
             createUserInOut(employee.getEmployeeId(), locationId, companyId, nextDayTimeIn);
-            return true; // existing record not updated
+            return true;
         } else {
-            // Within allowed gap → update existing record
+            // Within limit → update existing record
             existingRecord.setTimeOut(timeOut);
             userInOutRepository.save(existingRecord);
             return true;

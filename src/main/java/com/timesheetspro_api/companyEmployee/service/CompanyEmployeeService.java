@@ -8,7 +8,7 @@ import java.util.Map;
 
 public interface CompanyEmployeeService {
 
-    List<Map<String, Object>> getReports(int companyId,String type,int month);
+    List<Map<String, Object>> getReports(int companyId, String type, int month, String userTimeZone);
 
     List<Map<String, Object>> getAllEmployeeListByCompanyId(int companyId);
 
