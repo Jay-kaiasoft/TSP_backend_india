@@ -1,11 +1,14 @@
 package com.timesheetspro_api.salaryStatementHistory.serviceImpl;
 
 import com.timesheetspro_api.common.dto.SalaryStatementMaster.SalaryStatementMasterDto;
+import com.timesheetspro_api.common.dto.deductions.DeductionsDto;
 import com.timesheetspro_api.common.dto.salaryStatementHistory.SalaryStatementHistoryDto;
 import com.timesheetspro_api.common.model.CompanyEmployee.CompanyEmployee;
 import com.timesheetspro_api.common.model.UserInOut.UserInOut;
 import com.timesheetspro_api.common.model.companyDetails.CompanyDetails;
+import com.timesheetspro_api.common.model.deductions.Deductions;
 import com.timesheetspro_api.common.model.salaryStatementHistory.SalaryStatementHistory;
+import com.timesheetspro_api.common.repository.DeductionsRepository;
 import com.timesheetspro_api.common.repository.UserInOutRepository;
 import com.timesheetspro_api.common.repository.company.CompanyDetailsRepository;
 import com.timesheetspro_api.common.repository.company.CompanyEmployeeRepository;
@@ -45,6 +48,9 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
 
     @Autowired
     private CompanyEmployeeRepository companyEmployeeRepository;
+
+    @Autowired
+    private DeductionsRepository deductionsRepository;
 
     @Override
     public List<Map<String, Object>> filterSalaryStatementHistory(List<Integer> employeeId, List<Integer> departmentId, List<String> month, Integer companyId) {
@@ -114,6 +120,8 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
             SalaryStatementHistory salaryStatementHistory = this.salaryStatementHistoryRepository.findById(id).orElseThrow(() -> new RuntimeException("Salary Statement History not found"));
             SalaryStatementHistoryDto salaryStatementHistoryDto = new SalaryStatementHistoryDto();
             BeanUtils.copyProperties(salaryStatementHistory, salaryStatementHistoryDto);
+            salaryStatementHistoryDto.setAllowanceList(this.calculateTotalAllowanceAndDeductions(salaryStatementHistory.getEmployeeId(), "Allowance"));
+            salaryStatementHistoryDto.setDeductionsList(this.calculateTotalAllowanceAndDeductions(salaryStatementHistory.getEmployeeId(), "Deduction"));
             return salaryStatementHistoryDto;
         } catch (Exception e) {
             e.printStackTrace();
@@ -251,4 +259,17 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
         return YearMonth.parse(monthYear, formatter);
     }
 
+    // ===== Calculate total allowance
+    private List<DeductionsDto> calculateTotalAllowanceAndDeductions(Integer userId, String type) {
+        List<DeductionsDto> deductionsDtoList = new ArrayList<>();
+        List<Deductions> deductionsList = this.deductionsRepository.findByEmployeeIdAndType(userId, type);
+        for (Deductions deductions : deductionsList) {
+            DeductionsDto deductionsDto = new DeductionsDto();
+            deductionsDto.setLabel(deductions.getLabel());
+            deductionsDto.setAmount(deductions.getAmount());
+            deductionsDto.setType(deductions.getType());
+            deductionsDtoList.add(deductionsDto);
+        }
+        return deductionsDtoList;
+    }
 }

@@ -1,6 +1,9 @@
 package com.timesheetspro_api.common.dto.salaryStatementHistory;
 
+import com.timesheetspro_api.common.dto.deductions.DeductionsDto;
 import lombok.Data;
+
+import java.util.List;
 
 @Data
 public class SalaryStatementHistoryDto {
@@ -34,4 +37,6 @@ public class SalaryStatementHistoryDto {
     private String timeZone;
     private String note;
     private Integer generatedBy;
+    private List<DeductionsDto> deductionsList;
+    private List<DeductionsDto> allowanceList;
 }

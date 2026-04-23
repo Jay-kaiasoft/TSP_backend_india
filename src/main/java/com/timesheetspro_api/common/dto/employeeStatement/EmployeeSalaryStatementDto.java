@@ -1,6 +1,9 @@
 package com.timesheetspro_api.common.dto.employeeStatement;
 
+import com.timesheetspro_api.common.dto.deductions.DeductionsDto;
 import lombok.Data;
+
+import java.util.List;
 
 @Data
 public class EmployeeSalaryStatementDto {
@@ -26,4 +29,5 @@ public class EmployeeSalaryStatementDto {
     private Integer totalPaidDays;
     private Integer totalWorkingDays;
     private Integer totalDays;
+    private String employeeType;
 }

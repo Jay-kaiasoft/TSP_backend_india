@@ -11,4 +11,7 @@ import java.util.List;
 public interface DeductionsRepository extends JpaRepository<Deductions, Integer> {
     @Query("SELECT d FROM Deductions d WHERE d.companyEmployee.id=:id")
     List<Deductions> findByEmployeeId(Integer id);
+
+    @Query("SELECT d FROM Deductions d WHERE d.companyEmployee.id=:id AND d.type=:type")
+    List<Deductions> findByEmployeeIdAndType(Integer id,String type);
 }
