@@ -30,4 +30,6 @@ public class EmployeeSalaryStatementDto {
     private Integer totalWorkingDays;
     private Integer totalDays;
     private String employeeType;
+    private Integer totalAllowance;
+    private Integer deduction;
 }

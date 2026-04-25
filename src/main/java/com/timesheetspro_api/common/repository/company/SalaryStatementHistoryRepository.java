@@ -12,7 +12,7 @@ import java.util.List;
 @Repository
 public interface SalaryStatementHistoryRepository extends JpaRepository<SalaryStatementHistory, Integer>, JpaSpecificationExecutor<SalaryStatementHistory> {
     @Query("SELECT s FROM SalaryStatementHistory s WHERE s.employeeId=:id AND s.companyDetails.id=:companyId")
-    SalaryStatementHistory findByEmployeeId(int id, int companyId);
+    List<SalaryStatementHistory> findByEmployeeIdAndCompanyId(int id, int companyId);
 
     @Query("SELECT s FROM SalaryStatementHistory s WHERE s.departmentId=:id AND s.companyDetails.id=:companyId")
     List<SalaryStatementHistory> findByDepartmentId(int id, int companyId);

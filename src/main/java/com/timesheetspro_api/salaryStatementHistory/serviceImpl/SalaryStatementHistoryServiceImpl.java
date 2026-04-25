@@ -138,8 +138,13 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
                 startDate = this.commonService.convertStringToDate(dto.getStartDate());
                 endDate = this.commonService.convertStringToDate(dto.getEndDate());
 
+                // ✅ Adjust to full day range in UTC
+                startDate = toStartOfDayUtc(startDate);
+                endDate = toEndOfDayUtc(endDate);
+
                 Specification<UserInOut> userSpec = Specification.where(EmployeeStatementSpecification.hasUserIds(List.of(dto.getEmployeeId())));
-                userSpec = userSpec.and(EmployeeStatementSpecification.betweenCreatedOn(startDate, endDate));
+                userSpec = userSpec.and(EmployeeStatementSpecification.createdOnGreaterThanEqual(startDate));
+                userSpec = userSpec.and(EmployeeStatementSpecification.createdOnLessThanEqual(endDate));
 
                 List<UserInOut> userInOuts = this.userInOutRepository.findAll(userSpec);
                 for (UserInOut userInOut : userInOuts) {
@@ -271,5 +276,25 @@ public class SalaryStatementHistoryServiceImpl implements SalaryStatementHistory
             deductionsDtoList.add(deductionsDto);
         }
         return deductionsDtoList;
+    }
+
+    private Date toStartOfDayUtc(Date date) {
+        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        cal.setTime(date);
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal.getTime();
+    }
+
+    private Date toEndOfDayUtc(Date date) {
+        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        cal.setTime(date);
+        cal.set(Calendar.HOUR_OF_DAY, 23);
+        cal.set(Calendar.MINUTE, 59);
+        cal.set(Calendar.SECOND, 59);
+        cal.set(Calendar.MILLISECOND, 999);
+        return cal.getTime();
     }
 }

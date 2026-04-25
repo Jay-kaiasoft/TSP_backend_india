@@ -15,6 +15,7 @@ import com.timesheetspro_api.common.model.employeeBackAccountInfo.EmployeeBackAc
 import com.timesheetspro_api.common.model.employeeType.EmployeeType;
 import com.timesheetspro_api.common.model.holidayTemplates.HolidayTemplates;
 import com.timesheetspro_api.common.model.overtimeRules.OvertimeRules;
+import com.timesheetspro_api.common.model.salaryStatementHistory.SalaryStatementHistory;
 import com.timesheetspro_api.common.model.weeklyOff.WeeklyOff;
 import com.timesheetspro_api.common.repository.DepartmentRepository;
 import com.timesheetspro_api.common.repository.OvertimeRulesRepository;
@@ -85,97 +86,57 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
     @Autowired
     private HolidayTemplatesRepository holidayTemplatesRepository;
 
+    @Autowired
+    private SalaryStatementHistoryRepository salaryStatementHistoryRepository;
+
     @Override
     public List<Map<String, Object>> getReports(int companyId, String type, int month, String userTimeZone) {
         try {
-            // 1. Determine the year (use current year, or make it configurable)
             int year = LocalDate.now().getYear();
-
-            // 2. Build date range for the selected month (month: 0=Jan, 11=Dec)
             LocalDate startLocal = LocalDate.of(year, month + 1, 1);
             LocalDate endLocal = startLocal.withDayOfMonth(startLocal.lengthOfMonth());
-
-            // Convert to java.sql.Date (or java.util.Date) for your specifications
             Date startDate = Date.valueOf(startLocal);
             Date endDate = Date.valueOf(endLocal);
 
-            // 3. Build specification: company + date range + salaryGenerate = 1
             Specification<UserInOut> spec = Specification.where(UserInOutSpecification.hasCompany(companyId))
                     .and(EmployeeStatementSpecification.betweenCreatedOn(startDate, endDate))
                     .and((root, query, cb) -> cb.equal(root.get("isSalaryGenerate"), 1));
 
             List<UserInOut> userInOutList = userInOutRepository.findAll(spec);
 
-            // 4. Count distinct working days per employee
-            Map<Integer, Set<LocalDate>> employeeWorkDays = new HashMap<>();
-            ZoneId zone = ZoneId.of(userTimeZone); // use provided time zone
-            for (UserInOut userInOut : userInOutList) {
-                CompanyEmployee emp = userInOut.getUser();
-                if (emp == null) continue;
-                int empId = emp.getEmployeeId();
-                java.util.Date createdOn = userInOut.getCreatedOn();
-                if (createdOn != null) {
-                    LocalDate workDate = createdOn.toInstant().atZone(zone).toLocalDate();
-                    employeeWorkDays.computeIfAbsent(empId, k -> new HashSet<>()).add(workDate);
-                }
+            // Collect unique (employeeId, companyId) pairs
+            Set<String> uniqueKeys = new HashSet<>();
+            for (UserInOut u : userInOutList) {
+                String key = u.getUser().getEmployeeId() + "|" + u.getCompanyDetails().getId();
+                uniqueKeys.add(key);
             }
 
-            // 5. Build response for PF or PT
-            List<Map<String, Object>> response = new ArrayList<>();
-            for (Map.Entry<Integer, Set<LocalDate>> entry : employeeWorkDays.entrySet()) {
-                int empId = entry.getKey();
-                // daysWorked is available but not used in PF/PT calculation (PF/PT are monthly fixed)
-                // If you need pro-rating, you can use it, but standard is full month deduction.
-                Optional<CompanyEmployee> employeeOpt = companyEmployeeRepository.findById(empId);
-                if (!employeeOpt.isPresent()) continue;
-                CompanyEmployee emp = employeeOpt.get();
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (String key : uniqueKeys) {
+                String[] parts = key.split("\\|");
+                Integer employeeId = Integer.valueOf(parts[0]);
+                Integer compId = Integer.valueOf(parts[1]);
 
-                if ("PF".equals(type) && Boolean.TRUE.equals(emp.getIsPf())) {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("employeeId", empId);
-                    map.put("userName", emp.getFirstName() + " " + emp.getLastName());
-                    map.put("pf_type", emp.getPfType());
+                List<SalaryStatementHistory> historyList =
+                        salaryStatementHistoryRepository.findByEmployeeIdAndCompanyId(employeeId, compId);
 
-                    int monthlyBasic = emp.getBasicSalary();
-                    map.put("basic_salary", monthlyBasic);
-                    map.put("total_basic_salary", monthlyBasic); // only one month
-
-                    if ("Percentage".equals(emp.getPfType())) {
-                        int pfPercentage = Optional.ofNullable(emp.getPfPercentage()).orElse(0);
-                        BigDecimal pfAmount = BigDecimal.valueOf(monthlyBasic)
-                                .multiply(BigDecimal.valueOf(pfPercentage))
-                                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-                        // Cap at 1800 for employee + employer each, total 3600
-                        BigDecimal cappedEmployee = pfAmount.min(BigDecimal.valueOf(1800));
-                        BigDecimal cappedEmployer = pfAmount.min(BigDecimal.valueOf(1800));
-                        BigDecimal total = cappedEmployee.add(cappedEmployer).min(BigDecimal.valueOf(3600));
-
-                        map.put("employee_pf_amount", cappedEmployee);
-                        map.put("employer_pf_amount", cappedEmployer);
-                        map.put("total_amount", total);
-                        map.put("pf_percentage", pfPercentage);
-                    } else { // Fixed Amount
-                        int pfFixed = Optional.ofNullable(emp.getPfAmount()).orElse(0);
-                        map.put("employee_pf_amount", pfFixed);
-                        map.put("employer_pf_amount", pfFixed);
-                        map.put("total_amount", pfFixed * 2);
-                        map.put("pf_amount", pfFixed);
+                for (SalaryStatementHistory history : historyList) {
+                    // Build your result map as needed
+                    Map<String, Object> record = new HashMap<>();
+                    record.put("userName", history.getEmployeeName());
+                    CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
+                    if (type.equals("PT")) {
+                        record.put("pt_amount", companyEmployee.getPtAmount());
+                    }else{
+                        record.put("employee_pf_amount", history.getTotalPfAmount());
+                        record.put("employer_pf_amount", history.getTotalPfAmount());
+                        record.put("total_amount", history.getTotalPfAmount() * 2);
                     }
-                    response.add(map);
-                }
-
-                if ("PT".equals(type) && Boolean.TRUE.equals(emp.getIsPt())) {
-                    Map<String, Object> map = new HashMap<>();
-                    int ptAmount = Optional.ofNullable(emp.getPtAmount()).orElse(0);
-                    map.put("employeeId", empId);
-                    map.put("userName", emp.getFirstName() + " " + emp.getLastName());
-                    map.put("gross_salary", emp.getGrossSalary());
-                    map.put("total_gross_salary", emp.getGrossSalary()); // monthly
-                    map.put("pt_amount", ptAmount); // monthly PT amount (not multiplied)
-                    response.add(map);
+                    results.add(record);
                 }
             }
-            return response;
+            return results;
+
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e);
