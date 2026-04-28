@@ -283,7 +283,7 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 baseSalary = (int) Math.round(dailyRate * paidDayCount);
             }
         }
-        System.out.println("============ baseSalary =========="+baseSalary);
+        System.out.println("============ baseSalary ==========" + baseSalary);
         int otherDeductions = calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays) + penaltyAmount;
         int totalEarnings = baseSalary + otAmountFinal + totalAllowance;
 
@@ -291,16 +291,19 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
         dto.setPtAmount(ptAmount);
 
         // Canteen & Penalties
-        int totalDeductions =  otherDeductions + deductions + ptAmount;
+        int totalDeductions = otherDeductions + deductions + ptAmount;
 
         // PF & PT
-        int pfAmount = calculatePfAmount(totalEarnings - totalDeductions);
+        int pfAmount = companyEmployee.getIsPf() ? calculatePfAmount(totalEarnings - totalDeductions) : 0;
         dto.setTotalPfAmount(pfAmount);
-
-        if (totalEarnings - totalDeductions >= 15000) {
-            dto.setPfAmount(1800);
+        if (companyEmployee.getIsPf()) {
+            if (totalEarnings - totalDeductions >= 15000) {
+                dto.setPfAmount(1800);
+            } else {
+                dto.setPfPercentage(12);
+            }
         } else {
-            dto.setPfPercentage(12);
+            dto.setPfAmount(0);
         }
         totalDeductions += pfAmount;
         // 9. Set DTO values

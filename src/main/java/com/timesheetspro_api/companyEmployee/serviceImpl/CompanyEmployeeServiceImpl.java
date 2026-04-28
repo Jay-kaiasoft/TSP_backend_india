@@ -125,14 +125,15 @@ public class CompanyEmployeeServiceImpl implements CompanyEmployeeService {
                     Map<String, Object> record = new HashMap<>();
                     record.put("userName", history.getEmployeeName());
                     CompanyEmployee companyEmployee = this.companyEmployeeRepository.findById(employeeId).orElseThrow(() -> new RuntimeException("Employee not found"));
-                    if (type.equals("PT")) {
-                        record.put("pt_amount", companyEmployee.getPtAmount());
-                    }else{
+                    if (companyEmployee.getIsPf() && type.equals("PF")) {
                         record.put("employee_pf_amount", history.getTotalPfAmount());
                         record.put("employer_pf_amount", history.getTotalPfAmount());
                         record.put("total_amount", history.getTotalPfAmount() * 2);
+                        results.add(record);
+                    } else if (companyEmployee.getIsPt() && type.equals("PT")) {
+                        record.put("pt_amount", companyEmployee.getPtAmount());
+                        results.add(record);
                     }
-                    results.add(record);
                 }
             }
             return results;
