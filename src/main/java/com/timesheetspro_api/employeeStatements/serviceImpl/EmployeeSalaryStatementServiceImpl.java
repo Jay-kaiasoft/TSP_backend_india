@@ -195,7 +195,13 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 LocalDate date = timeIn.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
                 long workMinutes = workedMillis / (1000 * 60);
 
-                dailyWorkedMinutes.merge(date, workMinutes, Long::sum);
+                long lunchBreakMinutes = companyEmployee.getLunchBreak() != null
+                        ? companyEmployee.getLunchBreak()
+                        : 0L;
+                long adjustedWorkMinutes = Math.max(0, workMinutes - lunchBreakMinutes);
+
+                dailyWorkedMinutes.merge(date, adjustedWorkMinutes, Long::sum);
+//                dailyWorkedMinutes.merge(date, workMinutes, Long::sum);
                 actualWorkDays.add(date); // This adds the worked holiday (e.g., 25/03/26) to actualWorkDays
 
                 // Penalty Calculations
@@ -283,7 +289,6 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                 baseSalary = (int) Math.round(dailyRate * paidDayCount);
             }
         }
-        System.out.println("============ baseSalary ==========" + baseSalary);
         int otherDeductions = calculateCanteenDeductions(companyEmployee, dailyWorkedMinutes, actualWorkDays) + penaltyAmount;
         int totalEarnings = baseSalary + otAmountFinal + totalAllowance;
 
@@ -462,8 +467,9 @@ public class EmployeeSalaryStatementServiceImpl implements EmployeeSalaryStateme
                     heavyWorkingDays++;
                 }
             }
-
+            System.out.println("============= heavyWorkingDays ========"+heavyWorkingDays);
             int lightDays = workDays.size() - heavyWorkingDays;
+            System.out.println("=========== lightDays ========="+lightDays);
             return (lightDays * perDayAmount * 2) + (heavyWorkingDays * perDayAmount);
         } else {
             return 0;
